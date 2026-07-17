@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BacktestResult",
+  "description": "Results from a backtest run",
+  "type": "object",
+  "properties": {
+    "backtest_id": {"type": "string"},
+    "pair": {"type": "string"},
+    "start_slot": {"type": "integer"},
+    "end_slot": {"type": "integer"},
+    "duration_slots": {"type": "integer"},
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total_trades": {"type": "integer"},
+        "successful_trades": {"type": "integer"},
+        "failed_trades": {"type": "integer"},
+        "win_rate": {"type": "number"},
+        "total_profit_loss": {"type": "number"},
+        "avg_roi_per_trade_bps": {"type": "number"},
+        "volatility": {"type": "number"},
+        "sharpe_ratio": {"type": "number"},
+        "total_tip_cost": {"type": "number"},
+        "tip_to_profit_ratio": {"type": "number"}
+      }
+    },
+    "trades": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slot": {"type": "integer"},
+          "buy_dex": {"type": "string"},
+          "sell_dex": {"type": "string"},
+          "buy_price": {"type": "number"},
+          "sell_price": {"type": "number"},
+          "size": {"type": "number"},
+          "gross_profit": {"type": "number"},
+          "slippage": {"type": "number"},
+          "fees": {"type": "number"},
+          "tip": {"type": "number"},
+          "net_profit": {"type": "number"},
+          "roi_bps": {"type": "number"},
+          "success": {"type": "boolean"}
+        }
+      }
+    },
+    "performance_by_dex": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "trades": {"type": "integer"},
+          "avg_slippage_bps": {"type": "number"},
+          "success_rate": {"type": "number"}
+        }
+      }
+    }
+  }
+}

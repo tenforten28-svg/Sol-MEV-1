@@ -1,0 +1,1496 @@
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+WebSocket error: None isn't a valid URI: scheme isn't ws or wss
+ConnectionClosedError exception in shielded future
+future: <Future finished exception=ConnectionClosedError(None, Close(code=<CloseCode.INTERNAL_ERROR: 1011>, reason='keepalive ping timeout'), None)>
+Traceback (most recent call last):
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\site-packages\websockets\legacy\protocol.py", line 1279, in close_connection
+    await self.transfer_data_task
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\site-packages\websockets\legacy\protocol.py", line 945, in transfer_data
+    message = await self.read_message()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\site-packages\websockets\legacy\protocol.py", line 1015, in read_message
+    frame = await self.read_data_frame(max_size=self.max_size)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\site-packages\websockets\legacy\protocol.py", line 1090, in read_data_frame
+    frame = await self.read_frame(max_size)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\site-packages\websockets\legacy\protocol.py", line 1147, in read_frame
+    frame = await Frame.read(
+            ^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\site-packages\websockets\legacy\framing.py", line 71, in read
+    data = await reader(2)
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\asyncio\streams.py", line 769, in readexactly
+    await self._wait_for_data('readexactly')
+  File "C:\Users\Thembelihle Selepe\AppData\Local\Programs\Python\Python314\Lib\asyncio\streams.py", line 539, in _wait_for_data
+    await self._waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+websockets.exceptions.ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout; no close frame received
+WebSocket error: sent 1011 (internal error) keepalive ping timeout; no close frame received
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: 
+WebSocket error: 
+WebSocket error: 
+WebSocket error: 
+WebSocket error: 
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: [Errno 11001] getaddrinfo failed
+WebSocket error: 
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)
+WebSocket error: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1081)

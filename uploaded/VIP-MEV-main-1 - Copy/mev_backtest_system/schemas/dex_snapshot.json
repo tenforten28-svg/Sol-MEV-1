@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DexSnapshot",
+  "description": "Historical DEX state snapshot",
+  "type": "object",
+  "required": ["slot", "timestamp", "dex", "pair"],
+  "properties": {
+    "slot": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Solana slot number"
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp in microseconds"
+    },
+    "dex": {
+      "type": "string",
+      "enum": ["serum", "raydium", "orca", "jupiter"],
+      "description": "DEX identifier"
+    },
+    "pair": {
+      "type": "string",
+      "pattern": "^[A-Z]+/[A-Z]+$",
+      "description": "Trading pair (e.g., SOL/USDC)"
+    },
+    "best_bid": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Best bid price"
+    },
+    "best_ask": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Best ask price"
+    },
+    "liquidity_depth": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Total liquidity depth in USDC"
+    },
+    "virtual_price": {
+      "type": "number",
+      "description": "Computed virtual/mid price"
+    },
+    "pool_state": {
+      "type": "object",
+      "description": "DEX-specific pool state",
+      "properties": {
+        "reserve_a": {"type": "number"},
+        "reserve_b": {"type": "number"},
+        "sqrt_price": {"type": "number"},
+        "tick_current": {"type": "integer"},
+        "fee_rate": {"type": "number"}
+      }
+    },
+    "orderbook": {
+      "type": "object",
+      "description": "Orderbook snapshot (Serum)",
+      "properties": {
+        "bids": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "price": {"type": "number"},
+              "size": {"type": "number"}
+            }
+          }
+        },
+        "asks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "price": {"type": "number"},
+              "size": {"type": "number"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
