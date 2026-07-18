@@ -108,3 +108,8 @@ rust_price_feed/target/
 # OS
 .DS_Store
 Thumbs.db
+.env.*
+*.env
+credentials.json
+*.key
+.credentials
