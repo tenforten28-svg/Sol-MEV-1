@@ -12,12 +12,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Install Python deps first (better Docker layer caching)
-COPY requirements.txt .
+# NOTE: paths are relative to the REPO ROOT (Railway's build context).
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy the backend source
-COPY . .
+# Copy the backend source into the image working dir
+COPY backend/ .
 
 # Railway will set $PORT; default to 8001 locally
 ENV PORT=8001

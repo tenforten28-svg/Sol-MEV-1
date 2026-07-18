@@ -1,0 +1,46 @@
+# Root-level dockerignore — used by Railway when Dockerfile context = repo root.
+# Keep the image small by excluding everything the backend doesn't need.
+
+# Frontend + build tools (deployed separately on Vercel)
+frontend/
+node_modules/
+
+# Rust price feed (built separately, optional)
+rust_price_feed/
+
+# Docs & memory
+docs/
+memory/
+*.md
+!backend/README.md
+
+# Tests & reports
+tests/
+test_reports/
+test_result.md
+
+# Env files (secrets are set via Railway Variables, not baked in)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.mypy_cache/
+**/venv/
+**/.venv/
+
+# Editor / OS
+.git/
+.gitignore
+.emergent/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log
