@@ -21,7 +21,6 @@ function Navigation() {
             <h1 className="text-2xl font-bold text-white">Solana Arbitrage Bot</h1>
           </div>
           <nav className="flex gap-4">
-            {/* Deactivated - Stablecoin Bot
             <Link 
               to="/" 
               className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -32,25 +31,9 @@ function Navigation() {
             >
               <span className="flex items-center gap-2">
                 <Coins className="w-4 h-4" />
-                Stable Coins
+                Arbitrage Bot
               </span>
             </Link>
-            */}
-            {/* Deactivated - Meme Coin Bot
-            <Link 
-              to="/memes" 
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                isActive('/memes') 
-                  ? 'bg-purple-500 text-white' 
-                  : 'bg-slate-800 text-gray-300 hover:bg-slate-700'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                🎭
-                Meme Coins
-              </span>
-            </Link>
-            */}
             <Link 
               to="/flash" 
               className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -77,11 +60,8 @@ function App() {
       <BrowserRouter>
         <Navigation />
         <Routes>
-          <Route path="/" element={<FlashLoanDashboard />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/flash" element={<FlashLoanDashboard />} />
-          {/* Deactivated routes */}
-          {/* <Route path="/stablecoin" element={<Dashboard />} /> */}
-          {/* <Route path="/memes" element={<MemeDashboard />} /> */}
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
