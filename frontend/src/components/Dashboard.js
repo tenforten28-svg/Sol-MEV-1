@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { TrendingUp, TrendingDown, Activity, DollarSign, Target, Zap, Play, Pause } from 'lucide-react';
+import LiveTradingPanel from './LiveTradingPanel';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -161,8 +162,20 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* LIVE TRADING PANEL — separate from simulation stats below */}
+      <div className="max-w-7xl mx-auto">
+        <LiveTradingPanel />
+      </div>
+
       {/* Stats Cards */}
       {stats && (
+        <>
+        <div className="max-w-7xl mx-auto mb-2 flex items-center gap-2">
+          <span className="text-xs uppercase tracking-widest text-slate-500 font-mono">
+            ↓ Simulation Bot Stats (paper trading only)
+          </span>
+          <div className="flex-1 h-px bg-slate-800"></div>
+        </div>
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700 backdrop-blur-sm" data-testid="stat-card-opportunities">
             <CardHeader className="pb-3">
@@ -216,6 +229,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+        </>
       )}
 
       {/* Main Content */}

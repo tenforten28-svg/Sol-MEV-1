@@ -354,12 +354,85 @@ async def live_test_swap(req: LiveTestSwapRequest):
             "error": result.get("error"),
             "in_amount": result.get("in_amount"),
             "out_amount": result.get("out_amount"),
+            "submission_method": result.get("submission_method"),
+            "bundle_id": result.get("bundle_id"),
+            "jito_tip_lamports": result.get("jito_tip_lamports", 0),
+            "solscan_url": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
             "simulation": False,
         })
     except Exception as e:
         logger.warning(f"[live] failed to record trade: {e}")
 
     return {"ok": True, "dry_run": False, "pair": pair, **result}
+
+
+@api_router.get("/live/trades")
+async def live_trades(limit: int = 25):
+    """Return the most recent LIVE (non-simulation) trades from Mongo."""
+    try:
+        cursor = db.trades.find({"simulation": False}).sort("created_at", -1).limit(limit)
+        docs = []
+        async for d in cursor:
+            d.pop("_id", None)
+            docs.append(d)
+        return {"count": len(docs), "trades": docs}
+    except Exception as e:
+        return {"count": 0, "trades": [], "error": str(e)}
+
+
+@api_router.get("/live/summary")
+async def live_summary():
+    """Aggregate live-trading stats: wallet balance, PnL today, trades today, breakers."""
+    lt = get_live_trader()
+    sol_balance = 0.0
+    if lt.ready:
+        sol_balance = await lt.get_sol_balance()
+
+    # Aggregate today's live trades from Mongo
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        cursor = db.trades.find({
+            "simulation": False,
+            "created_at": {"$gte": today}
+        })
+        total = 0
+        successful = 0
+        total_usd = 0.0
+        total_jito_tips = 0
+        async for d in cursor:
+            total += 1
+            if d.get("success"):
+                successful += 1
+            total_usd += float(d.get("amount_usd", 0) or 0)
+            total_jito_tips += int(d.get("jito_tip_lamports", 0) or 0)
+    except Exception as e:
+        total = successful = 0
+        total_usd = 0.0
+        total_jito_tips = 0
+        logger.warning(f"[live/summary] aggregate error: {e}")
+
+    return {
+        "ready": lt.ready,
+        "wallet": lt.wallet_pubkey,
+        "sol_balance": sol_balance,
+        "sol_balance_usd_estimate": sol_balance * 150.0,  # rough
+        "meets_min_reserve": sol_balance >= lt.cfg.min_reserve_sol,
+        "today": {
+            "date_utc": today,
+            "total_trades": total,
+            "successful_trades": successful,
+            "success_rate_pct": round((successful / total * 100), 1) if total else 0,
+            "total_volume_usd": round(total_usd, 4),
+            "total_jito_tips_sol": round(total_jito_tips / 1_000_000_000, 6),
+        },
+        "risk": lt.risk.snapshot(),
+        "limits": {
+            "max_trade_usd": lt.cfg.max_trade_usd,
+            "daily_loss_limit_usd": lt.cfg.daily_loss_limit_usd,
+            "min_reserve_sol": lt.cfg.min_reserve_sol,
+        },
+        "jito_enabled": lt.cfg.use_jito,
+    }
 
 @api_router.get("/opportunities", response_model=List[ArbitrageOpportunity])
 async def get_opportunities(limit: int = 50, max_age_seconds: int = 120, include_executed: bool = True):
