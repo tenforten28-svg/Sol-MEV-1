@@ -65,6 +65,22 @@ MAX_SLIPPAGE_TOLERANCE = float(os.environ.get('MAX_SLIPPAGE_TOLERANCE', 0.0015))
 LATENCY_MS = int(os.environ.get('LATENCY_MS', 150))
 AUTO_EXECUTE = True  # Enable auto-execution for meme opportunities
 
+# ============================================================
+# RPC CREDIT BUDGET CONTROLS (QuickNode / Helius)
+# Configure these via Railway env vars to fit the free tier.
+# ============================================================
+# Seconds to wait between full scan cycles across ALL monitored pairs.
+SCAN_INTERVAL_SECONDS = float(os.environ.get('SCAN_INTERVAL_SECONDS', 2.5))
+
+# Comma-separated list of pairs to monitor.
+# Fewer pairs = fewer RPC calls per scan cycle.
+_pairs_env = os.environ.get('MONITORED_PAIRS', '').strip()
+CONFIGURED_PAIRS = [p.strip() for p in _pairs_env.split(',') if p.strip()] if _pairs_env else None
+
+# Estimated RPC credits consumed per full scan cycle (used for /api/credit_estimate)
+CREDITS_PER_PAIR_SCAN = int(os.environ.get('CREDITS_PER_PAIR_SCAN', 3))
+CREDITS_PER_TRADE = int(os.environ.get('CREDITS_PER_TRADE', 10))
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global risk_manager, dex_aggregator, meme_risk_manager, flash_loan_monitor
@@ -242,6 +258,67 @@ async def health():
     except Exception:
         db_ok = False
     return {"status": "ok", "db": db_ok, "simulation_mode": os.environ.get("SIMULATION_MODE", "true")}
+
+
+@api_router.get("/credit_estimate")
+async def credit_estimate():
+    """Projected monthly RPC credit usage based on current scan config.
+
+    Assumes each pair-scan uses ~CREDITS_PER_PAIR_SCAN credits and each executed
+    live trade uses ~CREDITS_PER_TRADE credits. Simulation mode uses ~0 credits.
+    """
+    config_data = await db.config.find_one({}, {"_id": 0}) or {}
+    pairs = config_data.get('monitored_pairs') or CONFIGURED_PAIRS or [
+        'SOL/USDC', 'RAY/USDC', 'ORCA/USDC', 'JUP/USDC',
+        'JTO/USDC', 'PYTH/USDC', 'SOL/USDT', 'USDC/USDT'
+    ]
+    pair_count = len(pairs)
+    interval = max(SCAN_INTERVAL_SECONDS, 0.1)
+
+    scans_per_day = int(86400 / interval)
+    credits_scan_daily = scans_per_day * pair_count * CREDITS_PER_PAIR_SCAN
+
+    # Add trade-execution credits (only if live mode)
+    sim_mode = str(os.environ.get('SIMULATION_MODE', 'true')).lower() == 'true'
+    trades_today = 0
+    try:
+        stats = risk_manager.get_stats() if risk_manager else {}
+        trades_today = stats.get('daily_trades', 0)
+    except Exception:
+        pass
+
+    credits_trades_daily = 0 if sim_mode else trades_today * CREDITS_PER_TRADE
+
+    daily_total = credits_scan_daily + credits_trades_daily
+    monthly_total = daily_total * 30
+
+    free_tier_limit = 10_000_000
+    utilisation_pct = round((monthly_total / free_tier_limit) * 100, 2)
+
+    return {
+        "config": {
+            "scan_interval_seconds": SCAN_INTERVAL_SECONDS,
+            "monitored_pair_count": pair_count,
+            "monitored_pairs": pairs,
+            "credits_per_pair_scan": CREDITS_PER_PAIR_SCAN,
+            "credits_per_trade": CREDITS_PER_TRADE,
+            "simulation_mode": sim_mode,
+        },
+        "projection": {
+            "scans_per_day": scans_per_day,
+            "credits_from_scans_per_day": credits_scan_daily,
+            "credits_from_trades_per_day": credits_trades_daily,
+            "credits_per_day": daily_total,
+            "credits_per_month": monthly_total,
+            "quicknode_free_tier_limit": free_tier_limit,
+            "utilisation_percent": utilisation_pct,
+            "verdict": (
+                "FITS_WITH_MARGIN" if utilisation_pct < 85
+                else "TARGETED_FULL_USE" if utilisation_pct <= 105
+                else "OVER_BUDGET"
+            ),
+        },
+    }
 
 @api_router.get("/opportunities", response_model=List[ArbitrageOpportunity])
 async def get_opportunities(limit: int = 50, max_age_seconds: int = 120, include_executed: bool = True):
@@ -633,10 +710,10 @@ async def monitor_arbitrage():
                 await asyncio.sleep(5)
                 continue
             
-            pairs = config_data.get('monitored_pairs', [
+            pairs = config_data.get('monitored_pairs') or CONFIGURED_PAIRS or [
                 'SOL/USDC', 'RAY/USDC', 'ORCA/USDC', 'JUP/USDC',
                 'JTO/USDC', 'PYTH/USDC', 'SOL/USDT', 'USDC/USDT'
-            ])
+            ]
             auto_execute = config_data.get('auto_execute', False)
             
             # Scan each pair
@@ -753,8 +830,8 @@ async def monitor_arbitrage():
                     logger.error(f"Error processing pair {pair}: {e}")
                     continue
             
-            # Check every 2-3 seconds (realistic scanning interval)
-            await asyncio.sleep(2.5)
+            # Check every SCAN_INTERVAL_SECONDS (configurable via env var)
+            await asyncio.sleep(SCAN_INTERVAL_SECONDS)
             
         except Exception as e:
             logger.error(f"Error in monitor_arbitrage: {e}")
