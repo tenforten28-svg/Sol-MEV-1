@@ -243,6 +243,124 @@ async def health():
         db_ok = False
     return {"status": "ok", "db": db_ok, "simulation_mode": os.environ.get("SIMULATION_MODE", "true")}
 
+
+# ============================================================
+# LIVE TRADING ENDPOINTS (Jupiter v6 + QuickNode)
+# ============================================================
+from live_trader import get_live_trader, MINTS, DECIMALS, WHITELISTED_PAIRS
+
+
+@api_router.get("/live/status")
+async def live_status():
+    """Show live-trader readiness, safety limits, and risk-breaker state."""
+    return get_live_trader().status()
+
+
+@api_router.get("/live/balance")
+async def live_balance():
+    """Get current wallet SOL balance from the RPC."""
+    lt = get_live_trader()
+    if not lt.ready:
+        return {"ready": False, "reason": "live trader not configured", "sol": 0.0}
+    sol = await lt.get_sol_balance()
+    return {"ready": True, "wallet": lt.wallet_pubkey, "sol": sol,
+            "meets_reserve": sol >= lt.cfg.min_reserve_sol}
+
+
+class LiveTestSwapRequest(BaseModel):
+    input_symbol: str            # e.g. "USDC"
+    output_symbol: str           # e.g. "SOL"
+    amount_usd: float            # size in USD (converted to base units internally)
+    dry_run: bool = True         # True = fetch quote only, no submit
+
+
+@api_router.post("/live/test_swap")
+async def live_test_swap(req: LiveTestSwapRequest):
+    """
+    Manual guarded live-swap endpoint. Use this to verify live trading works
+    with a tiny amount before enabling any auto-trading.
+
+    Enforces all safety gates. Set dry_run=false to actually submit on-chain.
+    """
+    lt = get_live_trader()
+    if not lt.ready:
+        return {"ok": False, "reason": "live trader not ready — check /api/live/status"}
+
+    in_sym = req.input_symbol.upper() if req.input_symbol.upper() in MINTS else req.input_symbol
+    out_sym = req.output_symbol.upper() if req.output_symbol.upper() in MINTS else req.output_symbol
+    if in_sym not in MINTS or out_sym not in MINTS:
+        return {"ok": False, "reason": f"unknown symbol; supported: {list(MINTS.keys())}"}
+
+    pair = f"{in_sym}/{out_sym}"
+    allowed, why = await lt.check_pair_allowed(pair)
+    if not allowed:
+        return {"ok": False, "reason": why}
+
+    can, why = lt.risk.can_trade(req.amount_usd)
+    if not can:
+        return {"ok": False, "reason": f"risk gate: {why}"}
+
+    # Balance check
+    sol_balance = await lt.get_sol_balance()
+    if sol_balance < lt.cfg.min_reserve_sol:
+        return {"ok": False, "reason": f"SOL balance {sol_balance:.4f} below min reserve {lt.cfg.min_reserve_sol}"}
+
+    # Convert amount_usd to base units.
+    # For USDC/USDT: 1 unit ≈ $1. For SOL/JitoSOL/mSOL: use approximate SOL price.
+    # (Approximation only; Jupiter quote returns the accurate output.)
+    SOL_USD_ESTIMATE = 150.0
+    if in_sym in ("USDC", "USDT"):
+        amount_base = int(req.amount_usd * (10 ** DECIMALS[in_sym]))
+    elif in_sym in ("SOL", "JitoSOL", "mSOL"):
+        amount_base = int((req.amount_usd / SOL_USD_ESTIMATE) * (10 ** DECIMALS[in_sym]))
+    elif in_sym == "JUP":
+        amount_base = int((req.amount_usd / 0.5) * (10 ** DECIMALS[in_sym]))  # ~$0.50 JUP
+    else:
+        return {"ok": False, "reason": f"unsupported input symbol {in_sym}"}
+
+    if req.dry_run:
+        try:
+            quote = await lt.jupiter.get_quote(
+                MINTS[in_sym], MINTS[out_sym], amount_base, lt.cfg.slippage_bps
+            )
+            return {
+                "ok": True,
+                "dry_run": True,
+                "pair": pair,
+                "amount_usd": req.amount_usd,
+                "amount_base_units": amount_base,
+                "quote_in_amount": quote.get("inAmount"),
+                "quote_out_amount": quote.get("outAmount"),
+                "price_impact_pct": quote.get("priceImpactPct"),
+                "route_labels": [step.get("swapInfo", {}).get("label") for step in quote.get("routePlan", [])],
+            }
+        except Exception as e:
+            return {"ok": False, "reason": f"quote error: {e}"}
+
+    # REAL submission
+    result = await lt.execute_swap(MINTS[in_sym], MINTS[out_sym], amount_base)
+    # Record as $0 pnl for now (single-leg swap isn't a full arb). Just tracks cooldown.
+    lt.risk.record_trade(0.0)
+
+    # Persist a MongoDB trade record for the dashboard
+    try:
+        await db.trades.insert_one({
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "pair": pair,
+            "type": "live_manual_swap",
+            "amount_usd": req.amount_usd,
+            "signature": result.get("signature"),
+            "success": result.get("success"),
+            "error": result.get("error"),
+            "in_amount": result.get("in_amount"),
+            "out_amount": result.get("out_amount"),
+            "simulation": False,
+        })
+    except Exception as e:
+        logger.warning(f"[live] failed to record trade: {e}")
+
+    return {"ok": True, "dry_run": False, "pair": pair, **result}
+
 @api_router.get("/opportunities", response_model=List[ArbitrageOpportunity])
 async def get_opportunities(limit: int = 50, max_age_seconds: int = 120, include_executed: bool = True):
     """
