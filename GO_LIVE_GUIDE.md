@@ -342,3 +342,104 @@ After you've done 5-10 manual `/api/live/test_swap` calls with `dry_run: false` 
 Then I'll help you wire the auto-execution path into `monitor_arbitrage` if the results warrant it.
 
 Good luck. 🚀
+
+---
+
+## 📦 Jito Bundle Support (added — MEV protection)
+
+The live trader now supports **Jito bundle submission** as an alternative to normal RPC. Bundles get:
+- ✅ Atomic inclusion (both swap + tip land together, or neither does)
+- ✅ Priority lane (jumps ahead of public mempool)
+- ✅ Protection from front-running / sandwich attacks by other MEV bots
+- ⚠️ Costs an extra tip on top of the priority fee
+
+### How to enable Jito (only when you're ready)
+
+Railway → Variables → set:
+
+```
+USE_JITO=true
+JITO_BLOCK_ENGINE_URL=https://mainnet.block-engine.jito.wtf
+JITO_TIP_LAMPORTS=10000            # 0.00001 SOL = ~$0.0015 (default)
+JITO_MAX_TIP_LAMPORTS=100000       # Hard cap = 0.0001 SOL = ~$0.015
+```
+
+Save. Backend redeploys. Every `execute_swap` call now goes through Jito.
+
+### Regional block engines (lower latency)
+
+Instead of the global endpoint, pick the closest one to your Railway region (US-East by default):
+
+| Region | URL |
+|---|---|
+| Amsterdam (EU) | `https://amsterdam.mainnet.block-engine.jito.wtf` |
+| Frankfurt (EU) | `https://frankfurt.mainnet.block-engine.jito.wtf` |
+| New York (US-East) ⭐ | `https://ny.mainnet.block-engine.jito.wtf` |
+| SLC (US-West) | `https://slc.mainnet.block-engine.jito.wtf` |
+| Tokyo (Asia) | `https://tokyo.mainnet.block-engine.jito.wtf` |
+| Global (default) | `https://mainnet.block-engine.jito.wtf` |
+
+For Railway's US-East region → **`https://ny.mainnet.block-engine.jito.wtf`** is optimal.
+
+### Tip Calibration
+
+Jito tips work like an auction — pay more, land higher. Reference:
+
+| Tip amount | SOL | USD | When to use |
+|---|---|---|---|
+| 5,000 | 0.000005 | $0.00075 | Quiet times |
+| 10,000 (default) | 0.00001 | $0.0015 | Normal market |
+| 50,000 | 0.00005 | $0.0075 | High competition |
+| 100,000 (max cap) | 0.0001 | $0.015 | Very juicy opportunity |
+| 1,000,000 | 0.001 | $0.15 | Only for large trades ($100+) |
+
+⚠️ **On a $0.50 test swap, a 100,000-lamport tip is 3% of your trade.** For tiny wallets, keep `JITO_TIP_LAMPORTS=10000`.
+
+### How to verify Jito is working
+
+After enabling, run:
+```bash
+curl -X POST https://<railway-url>/api/live/test_swap \
+  -H "Content-Type: application/json" \
+  -d '{"input_symbol":"SOL","output_symbol":"USDC","amount_usd":0.5,"dry_run":false}'
+```
+
+The response will now include:
+```json
+{
+  "success": true,
+  "signature": "5xY...",
+  "submission_method": "jito_bundle",   ← ← ← this is the proof
+  "bundle_id": "abc123...",
+  "jito_tip_lamports": 10000
+}
+```
+
+If `submission_method` shows `"jito_bundle"` — you're MEV-protected. If it shows `"direct_rpc_fallback"` — Jito rejected the bundle (usually price/timing) and we fell back to normal submission. This fallback is automatic and safe.
+
+### Auto-fallback safety
+
+If Jito submission fails for ANY reason (rate limit, network hiccup, invalid tx), the trader **automatically falls back to direct RPC** so your trade still executes. This is logged and shown in the response as `"direct_rpc_fallback"`.
+
+### Track bundle status
+
+Every bundle has a `bundle_id`. Check its status at:
+```
+https://explorer.jito.wtf/bundle/<bundle_id>
+```
+Shows whether the bundle landed, in which slot, and what the actual tip paid.
+
+### When Jito hurts more than helps
+
+- **Very small trades (<$1):** tip is a huge % of trade → net-negative
+- **Non-competitive pairs (obscure tokens):** no front-runners to worry about → wasted tip
+- **Simulation testing:** waste of money → keep `USE_JITO=false`
+- **Failed trades:** if the swap tx fails, the tip is still paid → costs money on losses
+
+### When Jito is essential
+
+- **Popular pairs (SOL/USDC, JUP/USDC):** high MEV competition
+- **Larger trades ($10+):** tip becomes tiny % of trade
+- **Any real arbitrage opportunity:** every other bot is using Jito too
+- **Once auto-execution is wired:** competitive setting matters
+

@@ -17,9 +17,10 @@ SAFETY-FIRST design for small wallets (~$12):
 import os
 import time
 import base64
+import random
 import logging
 from datetime import datetime, timezone
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 
 import aiohttp
 import base58
@@ -27,6 +28,8 @@ from solana.rpc.async_api import AsyncClient
 from solders.keypair import Keypair
 from solders.transaction import VersionedTransaction
 from solders.pubkey import Pubkey
+from solders.system_program import transfer, TransferParams
+from solders.message import MessageV0
 
 logger = logging.getLogger("live_trader")
 
@@ -49,6 +52,22 @@ WHITELISTED_PAIRS = {
 
 # Token decimals (needed to convert human amounts to base units)
 DECIMALS = {"SOL": 9, "USDC": 6, "USDT": 6, "JUP": 6, "JitoSOL": 9, "mSOL": 9}
+
+# =========================================================
+# JITO — MEV protection via bundled tx submission
+# =========================================================
+# Jito's public tip accounts (rotate randomly to spread load).
+# See: https://docs.jito.wtf/lowlatencytxnsend/#tip-accounts
+JITO_TIP_ACCOUNTS = [
+    "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "HFqU5x63VTqvQss8hp11i4bVmTpqFSZfxMQVKqhjGrwW",
+    "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+    "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+    "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+    "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+    "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+]
 
 # =========================================================
 # CONFIG — read from env, with safe defaults
@@ -85,6 +104,14 @@ class LiveTraderConfig:
         self.live_cooldown_seconds = _env_int("LIVE_COOLDOWN_SECONDS", 60)
         self.slippage_bps = _env_int("LIVE_SLIPPAGE_BPS", 50)
         self.profit_threshold_bps = _env_int("LIVE_PROFIT_THRESHOLD_BPS", 30)
+
+        # Jito bundle submission (MEV protection)
+        self.use_jito = _env_bool("USE_JITO", False)
+        self.jito_url = os.environ.get(
+            "JITO_BLOCK_ENGINE_URL", "https://mainnet.block-engine.jito.wtf"
+        ).rstrip("/")
+        self.jito_tip_lamports = _env_int("JITO_TIP_LAMPORTS", 10_000)  # ~$0.0015 default
+        self.jito_max_tip_lamports = _env_int("JITO_MAX_TIP_LAMPORTS", 100_000)  # hard cap ~$0.015
 
     @property
     def fully_configured(self) -> bool:
@@ -233,9 +260,60 @@ class LiveTrader:
             logger.warning(f"[live_trader] get_sol_balance failed: {e}")
             return 0.0
 
+    async def _build_tip_transaction(self, tip_lamports: int) -> Tuple[VersionedTransaction, str]:
+        """Build & sign a small system-transfer tx to a random Jito tip account."""
+        tip_account = Pubkey.from_string(random.choice(JITO_TIP_ACCOUNTS))
+        ix = transfer(TransferParams(
+            from_pubkey=self.wallet.pubkey(),
+            to_pubkey=tip_account,
+            lamports=tip_lamports,
+        ))
+        async with AsyncClient(self.cfg.rpc_url) as client:
+            resp = await client.get_latest_blockhash()
+            blockhash = resp.value.blockhash if hasattr(resp, "value") else resp["result"]["value"]["blockhash"]
+        msg = MessageV0.try_compile(
+            payer=self.wallet.pubkey(),
+            instructions=[ix],
+            address_lookup_table_accounts=[],
+            recent_blockhash=blockhash,
+        )
+        tx = VersionedTransaction(msg, [self.wallet])
+        return tx, str(tip_account)
+
+    async def _submit_jito_bundle(self, signed_swap_bytes: bytes,
+                                   tip_lamports: int) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Submit [swap_tx, tip_tx] as an atomic Jito bundle.
+        Returns (bundle_id, error). If bundle_id is set, submission succeeded.
+        """
+        tip_lamports = min(tip_lamports, self.cfg.jito_max_tip_lamports)  # hard cap
+        try:
+            tip_tx, tip_account = await self._build_tip_transaction(tip_lamports)
+            swap_b64 = base64.b64encode(signed_swap_bytes).decode()
+            tip_b64 = base64.b64encode(bytes(tip_tx)).decode()
+
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "sendBundle",
+                "params": [[swap_b64, tip_b64]],
+            }
+
+            async with aiohttp.ClientSession() as s:
+                url = f"{self.cfg.jito_url}/api/v1/bundles"
+                async with s.post(url, json=payload, timeout=15) as r:
+                    data = await r.json()
+                    if "result" in data:
+                        logger.info(f"[jito] bundle submitted: {data['result']} tip={tip_lamports} to {tip_account[:8]}...")
+                        return data["result"], None
+                    return None, str(data.get("error", data))
+        except Exception as e:
+            logger.exception("[jito] bundle submission failed")
+            return None, str(e)
+
     async def execute_swap(self, input_mint: str, output_mint: str,
                            amount_in_base_units: int) -> Dict[str, Any]:
-        """Execute one Jupiter swap. Returns dict with success, signature, error."""
+        """Execute one Jupiter swap. Uses Jito bundle if USE_JITO=true, else direct RPC."""
         if not self.ready:
             return {"success": False, "error": "live trader not ready (missing config)"}
 
@@ -256,17 +334,34 @@ class LiveTrader:
             unsigned = VersionedTransaction.from_bytes(raw)
             signed = VersionedTransaction(unsigned.message, [self.wallet])
             signed_bytes = bytes(signed)
+            swap_sig = str(signed.signatures[0])
 
-            # Submit
+            bundle_id: Optional[str] = None
+            submission_method = "direct_rpc"
+
+            # ---- Jito path ----
+            if self.cfg.use_jito:
+                bundle_id, jito_err = await self._submit_jito_bundle(
+                    signed_bytes, self.cfg.jito_tip_lamports
+                )
+                if bundle_id:
+                    submission_method = "jito_bundle"
+                else:
+                    # Fallback to direct RPC on Jito failure (with a warning)
+                    logger.warning(f"[jito] fallback to direct RPC: {jito_err}")
+                    submission_method = "direct_rpc_fallback"
+
+            # ---- Direct RPC path (or Jito fallback) ----
+            if submission_method != "jito_bundle":
+                async with AsyncClient(self.cfg.rpc_url) as client:
+                    await client.send_raw_transaction(signed_bytes)
+
+            # ---- Poll for confirmation ----
+            import asyncio
+            confirmed = False
+            err = None
+            deadline = time.time() + 60
             async with AsyncClient(self.cfg.rpc_url) as client:
-                send_resp = await client.send_raw_transaction(signed_bytes)
-                sig = str(send_resp.value if hasattr(send_resp, "value") else send_resp)
-
-                # Poll for confirmation (max 60s)
-                confirmed = False
-                err = None
-                deadline = time.time() + 60
-                import asyncio
                 while time.time() < deadline:
                     await asyncio.sleep(2)
                     try:
@@ -276,9 +371,11 @@ class LiveTrader:
                             if st.err:
                                 err = str(st.err)
                                 break
-                            if str(st.confirmation_status) in ("confirmed", "finalized",
-                                                                "TransactionConfirmationStatus.Confirmed",
-                                                                "TransactionConfirmationStatus.Finalized"):
+                            if str(st.confirmation_status) in (
+                                "confirmed", "finalized",
+                                "TransactionConfirmationStatus.Confirmed",
+                                "TransactionConfirmationStatus.Finalized",
+                            ):
                                 confirmed = True
                                 break
                     except Exception:
@@ -286,11 +383,14 @@ class LiveTrader:
 
             return {
                 "success": confirmed,
-                "signature": sig,
+                "signature": swap_sig,
                 "error": err,
                 "in_amount": quote.get("inAmount"),
                 "out_amount": quote.get("outAmount"),
                 "route": quote.get("routePlan", []),
+                "submission_method": submission_method,
+                "bundle_id": bundle_id,
+                "jito_tip_lamports": self.cfg.jito_tip_lamports if submission_method == "jito_bundle" else 0,
             }
         except Exception as e:
             logger.exception("[live_trader] execute_swap error")
@@ -312,6 +412,13 @@ class LiveTrader:
                 "cooldown_seconds": self.cfg.live_cooldown_seconds,
                 "slippage_bps": self.cfg.slippage_bps,
                 "profit_threshold_bps": self.cfg.profit_threshold_bps,
+            },
+            "jito": {
+                "enabled": self.cfg.use_jito,
+                "block_engine_url": self.cfg.jito_url,
+                "tip_lamports": self.cfg.jito_tip_lamports,
+                "tip_sol": self.cfg.jito_tip_lamports / 1_000_000_000,
+                "max_tip_lamports": self.cfg.jito_max_tip_lamports,
             },
             "whitelisted_pairs": sorted(WHITELISTED_PAIRS),
             "risk": self.risk.snapshot(),
