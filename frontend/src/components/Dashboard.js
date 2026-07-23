@@ -78,7 +78,7 @@ const Dashboard = () => {
     return () => {
       websocket.close();
     };
-  }, [BACKEND_URL, fetchData]);
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();

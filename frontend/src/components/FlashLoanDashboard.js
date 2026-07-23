@@ -68,6 +68,7 @@ const FlashLoanDashboard = () => {
       clearInterval(interval);
       clearInterval(historyInterval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchStats = async () => {
