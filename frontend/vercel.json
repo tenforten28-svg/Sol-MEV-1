@@ -1,9 +1,13 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "framework": null,
   "buildCommand": "CI=false yarn build",
   "outputDirectory": "build",
-  "installCommand": "yarn install --frozen-lockfile",
-  "framework": null,
+  "installCommand": "yarn install --frozen-lockfile --network-timeout 600000",
+  "devCommand": "yarn start",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
