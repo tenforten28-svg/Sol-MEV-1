@@ -298,7 +298,7 @@ class LiveTrader:
             return {
                 "ok": False,
                 "rpc_reachable": False,
-                "error": str(e),
+                "error": str(e) or repr(e) or type(e).__name__,
                 "rpc_host": self.cfg.rpc_url.split("//")[-1].split("/")[0],
             }
 
