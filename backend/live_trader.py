@@ -242,14 +242,22 @@ class LiveTrader:
     def ready(self) -> bool:
         return self.cfg.fully_configured and self.wallet is not None
 
+    @property
+    def wallet_configured(self) -> bool:
+        """Wallet + RPC available — enough to fetch balance, NOT enough to trade.
+        Trading additionally requires SIMULATION_MODE=false AND LIVE_TRADING_ENABLED=true.
+        """
+        return bool(self.cfg.rpc_url and self.wallet)
+
     async def check_pair_allowed(self, pair: str) -> Tuple[bool, str]:
         if pair not in WHITELISTED_PAIRS:
             return False, f"pair '{pair}' not in whitelist {sorted(WHITELISTED_PAIRS)}"
         return True, "ok"
 
     async def get_sol_balance(self) -> float:
-        """Return SOL balance in whole SOL."""
-        if not self.ready:
+        """Return SOL balance in whole SOL. Works whenever wallet + RPC are configured,
+        even if trading gates (LIVE_TRADING_ENABLED / SIMULATION_MODE) are still safe."""
+        if not self.wallet_configured:
             return 0.0
         try:
             async with AsyncClient(self.cfg.rpc_url) as client:
@@ -399,6 +407,7 @@ class LiveTrader:
     def status(self) -> Dict[str, Any]:
         return {
             "ready": self.ready,
+            "wallet_configured": self.wallet_configured,
             "simulation_mode": self.cfg.simulation_mode,
             "live_enabled": self.cfg.live_enabled,
             "has_rpc_url": bool(self.cfg.rpc_url),

@@ -258,12 +258,15 @@ async def live_status():
 
 @api_router.get("/live/balance")
 async def live_balance():
-    """Get current wallet SOL balance from the RPC."""
+    """Get current wallet SOL balance from the RPC.
+    Works when wallet+RPC configured, even if trading is still safely disabled."""
     lt = get_live_trader()
-    if not lt.ready:
-        return {"ready": False, "reason": "live trader not configured", "sol": 0.0}
+    if not lt.wallet_configured:
+        return {"ready": False, "wallet_configured": False,
+                "reason": "SOLANA_PRIVATE_KEY or SOLANA_RPC_URL not set", "sol": 0.0}
     sol = await lt.get_sol_balance()
-    return {"ready": True, "wallet": lt.wallet_pubkey, "sol": sol,
+    return {"ready": lt.ready, "wallet_configured": True,
+            "wallet": lt.wallet_pubkey, "sol": sol,
             "meets_reserve": sol >= lt.cfg.min_reserve_sol}
 
 
@@ -368,9 +371,16 @@ async def live_test_swap(req: LiveTestSwapRequest):
 
 @api_router.get("/live/trades")
 async def live_trades(limit: int = 25):
-    """Return the most recent LIVE (non-simulation) trades from Mongo."""
+    """Return the most recent LIVE trades submitted through the LiveTrader (Jupiter+QuickNode).
+    Excludes simulation-bot trade records that may also have `simulation: false`."""
     try:
-        cursor = db.trades.find({"simulation": False}).sort("created_at", -1).limit(limit)
+        # Only trades explicitly submitted through /api/live/test_swap (or the future auto-executor).
+        # This filter avoids picking up simulation-bot records that happen to have
+        # simulation=false (which occurs when the Mongo `config.simulation_mode` was toggled).
+        cursor = db.trades.find({
+            "type": {"$in": ["live_manual_swap"]},
+            "signature": {"$ne": None},
+        }).sort("created_at", -1).limit(limit)
         docs = []
         async for d in cursor:
             d.pop("_id", None)
@@ -384,15 +394,18 @@ async def live_trades(limit: int = 25):
 async def live_summary():
     """Aggregate live-trading stats: wallet balance, PnL today, trades today, breakers."""
     lt = get_live_trader()
+
+    # Balance now works whenever wallet+RPC are configured (even in safe/simulation mode)
     sol_balance = 0.0
-    if lt.ready:
+    if lt.wallet_configured:
         sol_balance = await lt.get_sol_balance()
 
-    # Aggregate today's live trades from Mongo
+    # Aggregate today's live trades — only real LiveTrader-originated records
     today = datetime.now(timezone.utc).date().isoformat()
     try:
         cursor = db.trades.find({
-            "simulation": False,
+            "type": {"$in": ["live_manual_swap"]},
+            "signature": {"$ne": None},
             "created_at": {"$gte": today}
         })
         total = 0
@@ -413,6 +426,7 @@ async def live_summary():
 
     return {
         "ready": lt.ready,
+        "wallet_configured": lt.wallet_configured,
         "wallet": lt.wallet_pubkey,
         "sol_balance": sol_balance,
         "sol_balance_usd_estimate": sol_balance * 150.0,  # rough

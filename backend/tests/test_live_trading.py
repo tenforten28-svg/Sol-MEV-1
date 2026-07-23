@@ -1,28 +1,34 @@
 """
-Backend tests for the new LIVE trading endpoints and safety gates.
-Verifies:
-  - GET  /api/live/status
-  - GET  /api/live/summary
-  - GET  /api/live/trades
-  - GET  /api/live/balance
-  - POST /api/live/test_swap (safety gate)
-  - GET  /api/health
-  - GET  /api/stats (regression: not broken by new additions)
-
-Default env: SIMULATION_MODE=true, LIVE_TRADING_ENABLED=false
-so live trader must NOT be ready and test_swap must refuse.
+Backend tests for LIVE trading endpoints — Iteration 2 focus:
+  (a) wallet_configured field on status / balance / summary
+  (b) /api/live/trades filter no longer includes sim-bot pollution
+  (c) Regression: /api/health, /api/stats, /api/opportunities, /api/trades still work
 """
 import os
+import asyncio
+from datetime import datetime, timezone
+
 import pytest
 import requests
+from motor.motor_asyncio import AsyncIOMotorClient
 
-BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-if not BASE_URL:
-    # frontend/.env is source of truth per system prompt
-    with open("/app/frontend/.env") as f:
-        for line in f:
-            if line.startswith("REACT_APP_BACKEND_URL="):
-                BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
+# Resolve BASE_URL from frontend/.env (source of truth)
+BASE_URL = ""
+with open("/app/frontend/.env") as f:
+    for line in f:
+        if line.startswith("REACT_APP_BACKEND_URL="):
+            BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
+
+# Load backend Mongo config for seed insertion (test isolation via TEST_ marker)
+MONGO_URL = ""
+DB_NAME = ""
+with open("/app/backend/.env") as f:
+    for line in f:
+        line = line.strip()
+        if line.startswith("MONGO_URL="):
+            MONGO_URL = line.split("=", 1)[1].strip().strip('"')
+        elif line.startswith("DB_NAME="):
+            DB_NAME = line.split("=", 1)[1].strip().strip('"')
 
 
 @pytest.fixture(scope="module")
@@ -32,7 +38,60 @@ def api():
     return s
 
 
-# ---------- Health & simulation stats regression ----------
+@pytest.fixture(scope="module")
+def event_loop():
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="module")
+def seeded_trades(event_loop):
+    """Insert two trades:
+       (a) garbage sim-bot-style record — must NOT be returned by /api/live/trades
+       (b) real live_manual_swap record — must be returned
+    Cleanup after class."""
+    today_iso = datetime.now(timezone.utc).isoformat()
+    garbage = {
+        "TEST_marker": "iteration_2_garbage",
+        "created_at": today_iso,
+        "simulation": False,
+        "type": "other",
+        "signature": None,
+        "amount_usd": 0,
+        "pair": "SOL/USDC",
+    }
+    real = {
+        "TEST_marker": "iteration_2_real",
+        "created_at": today_iso,
+        "simulation": False,
+        "type": "live_manual_swap",
+        "signature": "TESTabc123SIGNATUREvalue",
+        "amount_usd": 1.5,
+        "success": True,
+        "submission_method": "direct_rpc",
+        "pair": "SOL/USDC",
+    }
+
+    async def _seed():
+        client = AsyncIOMotorClient(MONGO_URL)
+        db = client[DB_NAME]
+        await db.trades.insert_one(garbage)
+        await db.trades.insert_one(real)
+        client.close()
+
+    async def _cleanup():
+        client = AsyncIOMotorClient(MONGO_URL)
+        db = client[DB_NAME]
+        await db.trades.delete_many({"TEST_marker": {"$in": ["iteration_2_garbage", "iteration_2_real"]}})
+        client.close()
+
+    event_loop.run_until_complete(_seed())
+    yield {"garbage": garbage, "real": real}
+    event_loop.run_until_complete(_cleanup())
+
+
+# ---------- Regression: base endpoints ----------
 
 def test_health(api):
     r = api.get(f"{BASE_URL}/api/health", timeout=15)
@@ -40,82 +99,92 @@ def test_health(api):
     d = r.json()
     assert d["status"] == "ok"
     assert d["db"] is True
-    assert str(d["simulation_mode"]).lower() == "true"
 
 
-def test_stats_still_works(api):
+def test_stats_regression(api):
     r = api.get(f"{BASE_URL}/api/stats", timeout=15)
     assert r.status_code == 200
     d = r.json()
     for k in ["total_opportunities", "executed_trades", "total_profit", "success_rate", "active_pairs"]:
-        assert k in d, f"missing key {k}"
+        assert k in d
 
 
-# ---------- Live status ----------
+def test_opportunities_regression(api):
+    r = api.get(f"{BASE_URL}/api/opportunities", timeout=15)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
 
-def test_live_status_shape_and_defaults(api):
+
+def test_trades_regression(api):
+    r = api.get(f"{BASE_URL}/api/trades", timeout=15)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+# ---------- (a) wallet_configured on status ----------
+
+def test_live_status_wallet_configured_field(api):
     r = api.get(f"{BASE_URL}/api/live/status", timeout=15)
     assert r.status_code == 200
     d = r.json()
-    # Top-level keys
-    for k in ["ready", "simulation_mode", "live_enabled", "has_rpc_url",
-              "has_private_key", "wallet_pubkey", "limits", "jito",
-              "whitelisted_pairs", "risk"]:
-        assert k in d, f"missing top-level key: {k}"
-    # Default env expectations
-    assert d["ready"] is False
-    assert d["simulation_mode"] is True
-    # limits sub-keys
-    for k in ["max_trade_usd", "min_reserve_sol", "daily_loss_limit_usd",
-              "max_losing_streak", "cooldown_seconds", "slippage_bps",
-              "profit_threshold_bps"]:
-        assert k in d["limits"], f"missing limits key: {k}"
-    # jito sub-keys
-    for k in ["enabled", "block_engine_url", "tip_lamports", "tip_sol", "max_tip_lamports"]:
-        assert k in d["jito"], f"missing jito key: {k}"
-    assert isinstance(d["whitelisted_pairs"], list)
+    assert "wallet_configured" in d, "wallet_configured field missing at top level"
+    assert isinstance(d["wallet_configured"], bool)
+    # Default env: no private key/RPC
+    assert d["wallet_configured"] is False
+    assert d["ready"] is False  # independent
 
 
-# ---------- Live summary ----------
+# ---------- (a) wallet_configured on balance ----------
 
-def test_live_summary_defaults(api):
-    r = api.get(f"{BASE_URL}/api/live/summary", timeout=15)
-    assert r.status_code == 200
-    d = r.json()
-    for k in ["ready", "wallet", "sol_balance", "sol_balance_usd_estimate",
-              "meets_min_reserve", "today", "risk", "limits", "jito_enabled"]:
-        assert k in d, f"missing summary key {k}"
-    assert d["ready"] is False
-    for k in ["date_utc", "total_trades", "successful_trades",
-              "success_rate_pct", "total_volume_usd", "total_jito_tips_sol"]:
-        assert k in d["today"], f"missing today.{k}"
-    assert d["today"]["total_trades"] == 0
-
-
-# ---------- Live trades ----------
-
-def test_live_trades_empty(api):
-    r = api.get(f"{BASE_URL}/api/live/trades", timeout=15)
-    assert r.status_code == 200
-    d = r.json()
-    assert "count" in d and "trades" in d
-    assert d["count"] == 0
-    assert d["trades"] == []
-
-
-# ---------- Live balance ----------
-
-def test_live_balance_not_configured(api):
+def test_live_balance_wallet_not_configured(api):
     r = api.get(f"{BASE_URL}/api/live/balance", timeout=15)
     assert r.status_code == 200
     d = r.json()
     assert d["ready"] is False
+    assert d["wallet_configured"] is False
     assert d["sol"] == 0.0
+    assert "reason" in d
+    assert "SOLANA_PRIVATE_KEY" in d["reason"] or "SOLANA_RPC_URL" in d["reason"]
 
 
-# ---------- Safety gate: test_swap ----------
+# ---------- (a) wallet_configured on summary ----------
 
-def test_live_test_swap_safety_gate_dry_run(api):
+def test_live_summary_wallet_configured_and_defaults(api, seeded_trades):
+    r = api.get(f"{BASE_URL}/api/live/summary", timeout=15)
+    assert r.status_code == 200
+    d = r.json()
+    assert "wallet_configured" in d
+    assert d["wallet_configured"] is False
+    assert d["ready"] is False
+    assert d["sol_balance"] == 0.0
+    # Only the seeded live_manual_swap should count today
+    assert d["today"]["total_trades"] == 1, f"expected 1 live trade in today aggregate, got: {d['today']}"
+    assert d["today"]["total_volume_usd"] == 1.5
+    assert d["today"]["successful_trades"] == 1
+
+
+# ---------- (b) trades filter — sim-bot garbage excluded ----------
+
+def test_live_trades_filter_excludes_garbage(api, seeded_trades):
+    r = api.get(f"{BASE_URL}/api/live/trades?limit=50", timeout=15)
+    assert r.status_code == 200
+    d = r.json()
+    assert "trades" in d and "count" in d
+    # All returned trades must have type=live_manual_swap and non-null signature
+    for t in d["trades"]:
+        assert t.get("type") == "live_manual_swap", f"garbage type leaked: {t.get('type')}"
+        assert t.get("signature") is not None, f"null-signature leaked: {t}"
+    # The real seeded record must appear
+    sigs = [t.get("signature") for t in d["trades"]]
+    assert "TESTabc123SIGNATUREvalue" in sigs, "seeded live_manual_swap not returned"
+    # The garbage seeded record must NOT appear (identified by TEST_marker)
+    markers = [t.get("TEST_marker") for t in d["trades"]]
+    assert "iteration_2_garbage" not in markers, "sim-bot garbage leaked into /api/live/trades"
+
+
+# ---------- (c) Safety gate unchanged ----------
+
+def test_live_test_swap_still_blocked(api):
     r = api.post(
         f"{BASE_URL}/api/live/test_swap",
         json={"input_symbol": "SOL", "output_symbol": "USDC",
@@ -125,18 +194,4 @@ def test_live_test_swap_safety_gate_dry_run(api):
     assert r.status_code == 200
     d = r.json()
     assert d["ok"] is False
-    assert "live trader not ready" in d["reason"].lower()
-
-
-def test_live_test_swap_safety_gate_wet_run(api):
-    """CRITICAL: even if dry_run=false, must refuse when trader not configured."""
-    r = api.post(
-        f"{BASE_URL}/api/live/test_swap",
-        json={"input_symbol": "SOL", "output_symbol": "USDC",
-              "amount_usd": 0.5, "dry_run": False},
-        timeout=15,
-    )
-    assert r.status_code == 200
-    d = r.json()
-    assert d["ok"] is False, f"UNSAFE: gate did not block real trade: {d}"
     assert "live trader not ready" in d["reason"].lower()

@@ -137,6 +137,11 @@ export default function LiveTradingPanel() {
             <span className="font-mono text-amber-300">missing SOLANA_PRIVATE_KEY </span>
           )}
           <span className="text-slate-500">— set these on Railway to enable</span>
+          {status.wallet_configured && (
+            <div className="mt-1 text-emerald-400/80 text-[11px]">
+              ✓ wallet + RPC configured — balance visible below (still safe, no auto-trades)
+            </div>
+          )}
         </div>
       )}
 

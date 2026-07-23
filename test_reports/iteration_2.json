@@ -1,0 +1,24 @@
+{
+  "summary": "Iteration 2: verified both bug fixes. (a) wallet_configured field added to /api/live/status, /api/live/balance, /api/live/summary — correctly False in default env and independent of `ready`; balance endpoint no longer requires ready:true and returns clean {ready:false, wallet_configured:false, sol:0.0, reason:...}. (b) /api/live/trades filter now {type:'live_manual_swap', signature:$ne:null} — seeded a garbage sim-bot record (type='other', signature=null, simulation:false) and a real live_manual_swap record; only the real one is returned. Summary today.total_trades correctly aggregates only live_manual_swap → 1 trade, $1.50 volume. Safety gate on /api/live/test_swap unchanged. Regression endpoints (/api/health, /api/stats, /api/opportunities, /api/trades) still work. Frontend LiveTradingPanel renders BLOCKED (safe), reason line shows only the missing gating vars (LIVE_TRADING_ENABLED=false, SIMULATION_MODE=true, missing SOLANA_PRIVATE_KEY — SOLANA_RPC_URL is set in this env so that line is correctly hidden), emerald 'wallet + RPC configured' line correctly hidden when wallet_configured=false, Wallet SOL tile shows 0.0000, and 'Recent Live Trades' shows the empty-state message (no 15 phantom rows). 9/9 pytest tests pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_live_trading.py",
+    "/app/test_reports/pytest/live_trading.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "The emerald 'wallet + RPC configured' branch inside LiveTradingPanel could not be exercised end-to-end in this sandbox because setting a real SOLANA_PRIVATE_KEY is out of scope, but the code path is straightforward: it renders when `status.wallet_configured===true` inside the !ready block, which will be reached whenever user sets SOLANA_PRIVATE_KEY but leaves LIVE_TRADING_ENABLED=false.",
+    "live/summary today aggregation still uses lexical ISO-string comparison ({created_at:{$gte: 'YYYY-MM-DD'}}); works but a proper datetime range is more explicit (carry-over from iteration_1).",
+    "server.py still 972 lines — carry-over recommendation to split into routers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_live_trading.py (rewrote with 9 targeted tests including seed-based Mongo verification of the trades filter fix)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100%"},
+  "seed_data_creation": "Two records inserted into Mongo `trades` collection (marked with TEST_marker: iteration_2_garbage / iteration_2_real) inside a pytest fixture that also cleans them up after the module tests finish. Verified cleanup ran (Mongo trades count unchanged after suite).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend default env: SOLANA_RPC_URL IS set (so has_rpc_url=true), SOLANA_PRIVATE_KEY NOT set (has_private_key=false → wallet_configured=false). LiveTradingPanel therefore hides the 'missing SOLANA_RPC_URL' line (correct) and shows 'missing SOLANA_PRIVATE_KEY'. If retesting with a real SOLANA_PRIVATE_KEY set, expect outbound-DNS-blocked errors when trying to reach QuickNode/Jupiter but the wallet_configured code path (emerald line, non-zero SOL tile once RPC responds) will activate. Frontend also has a live simulation panel below LIVE Trading that continues to pull from /api/stats independently — regression verified.",
+  "rca of the issue": "N/A — both fixes work as designed. Original bug (RCA1): get_sol_balance was previously gated on lt.ready which required SIMULATION_MODE=false AND LIVE_TRADING_ENABLED=true, so balance appeared 0.0000 even when the user set SOLANA_PRIVATE_KEY. Fix: new `wallet_configured` property (rpc_url AND wallet loaded) decouples balance visibility from trade-enable gates. Original bug (RCA2): /api/live/trades filter was {simulation:false} which was polluted by sim-bot inserts when Mongo config.simulation_mode=false in prod Atlas. Fix: filter is now {type:{$in:['live_manual_swap']}, signature:{$ne:null}} — verified with seeded garbage + real records that only the real one is returned."
+}
