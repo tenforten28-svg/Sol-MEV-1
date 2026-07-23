@@ -268,6 +268,40 @@ class LiveTrader:
             logger.warning(f"[live_trader] get_sol_balance failed: {e}")
             return 0.0
 
+    async def rpc_ping(self) -> Dict[str, Any]:
+        """Diagnostic: verify QuickNode RPC is reachable and credentials work.
+        Uses ~2 credits (getVersion + getSlot). Returns detailed diagnostics
+        so silent failures become visible.
+        """
+        if not self.cfg.rpc_url:
+            return {"ok": False, "reason": "SOLANA_RPC_URL not set"}
+        try:
+            async with AsyncClient(self.cfg.rpc_url) as client:
+                # getVersion — cheapest possible RPC call, no auth needed to work
+                version_resp = await client.get_version()
+                slot_resp = await client.get_slot()
+                slot = slot_resp.value if hasattr(slot_resp, "value") else None
+                # get_version returns an object with solana_core, feature_set
+                sc = None
+                if hasattr(version_resp, "value") and version_resp.value:
+                    sc = getattr(version_resp.value, "solana_core", None) \
+                         or getattr(version_resp.value, "solana-core", None)
+                return {
+                    "ok": True,
+                    "rpc_reachable": True,
+                    "solana_core": sc,
+                    "current_slot": slot,
+                    "rpc_host": self.cfg.rpc_url.split("//")[-1].split("/")[0],
+                    "credits_used_by_this_call": "~2 (getVersion + getSlot)",
+                }
+        except Exception as e:
+            return {
+                "ok": False,
+                "rpc_reachable": False,
+                "error": str(e),
+                "rpc_host": self.cfg.rpc_url.split("//")[-1].split("/")[0],
+            }
+
     async def _build_tip_transaction(self, tip_lamports: int) -> Tuple[VersionedTransaction, str]:
         """Build & sign a small system-transfer tx to a random Jito tip account."""
         tip_account = Pubkey.from_string(random.choice(JITO_TIP_ACCOUNTS))

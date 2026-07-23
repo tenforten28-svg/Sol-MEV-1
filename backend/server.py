@@ -264,10 +264,29 @@ async def live_balance():
     if not lt.wallet_configured:
         return {"ready": False, "wallet_configured": False,
                 "reason": "SOLANA_PRIVATE_KEY or SOLANA_RPC_URL not set", "sol": 0.0}
-    sol = await lt.get_sol_balance()
-    return {"ready": lt.ready, "wallet_configured": True,
-            "wallet": lt.wallet_pubkey, "sol": sol,
-            "meets_reserve": sol >= lt.cfg.min_reserve_sol}
+    # Do a real RPC call and surface any error explicitly
+    try:
+        async with AsyncClient(lt.cfg.rpc_url) as client:
+            resp = await client.get_balance(lt.wallet.pubkey())
+            lamports = resp.value if hasattr(resp, "value") else 0
+            sol = lamports / 1_000_000_000
+            return {"ready": lt.ready, "wallet_configured": True,
+                    "wallet": lt.wallet_pubkey, "sol": sol,
+                    "rpc_ok": True, "meets_reserve": sol >= lt.cfg.min_reserve_sol}
+    except Exception as e:
+        return {"ready": lt.ready, "wallet_configured": True,
+                "wallet": lt.wallet_pubkey, "sol": 0.0,
+                "rpc_ok": False, "rpc_error": str(e),
+                "meets_reserve": False}
+
+
+@api_router.get("/live/rpc_ping")
+async def live_rpc_ping():
+    """Diagnostic — verify QuickNode RPC is reachable & responding.
+    Costs ~2 credits per call. Use this to prove your RPC config works
+    before firing real trades. Reports errors explicitly instead of silently returning 0."""
+    lt = get_live_trader()
+    return await lt.rpc_ping()
 
 
 class LiveTestSwapRequest(BaseModel):
