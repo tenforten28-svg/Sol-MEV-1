@@ -48,10 +48,12 @@ class TestModuleSurface:
 
     def test_dangerous_t22_extension_set(self):
         expected = {
-            "transferFeeConfig", "permanentDelegate", "defaultAccountState",
+            "transferFeeConfig", "permanentDelegate",
             "nonTransferable", "transferHook", "mintCloseAuthority",
         }
         assert expected.issubset(pa.DANGEROUS_T22_EXTENSIONS)
+        # it14: defaultAccountState is now state-aware (only Frozen is rejected)
+        assert "defaultAccountState" not in pa.DANGEROUS_T22_EXTENSIONS
 
     @pytest.mark.parametrize("name", [
         "_check_holders_concentration", "_check_curve_state",
@@ -92,7 +94,7 @@ class TestConfigDefaults:
         cfg = pa.AutoBuyConfig()
         assert cfg.max_top10_pct == 30.0
         assert cfg.max_holder_pct == 20.0
-        assert cfg.min_curve_sol == 0.5
+        assert cfg.min_curve_sol == 0.01  # it14: lowered from 0.5
         assert cfg.reject_dangerous_t22 is True
         assert cfg.max_dev_hold_pct == 15.0
         assert cfg.require_authorities_revoked is True
@@ -231,7 +233,7 @@ class TestAutobuyStatusNewKeys:
         c = cfg["config"]
         assert c["max_top10_pct"] == 30.0
         assert c["max_holder_pct"] == 20.0
-        assert c["min_curve_sol"] == 0.5
+        assert c["min_curve_sol"] == 0.01  # it14: lowered from 0.5
         assert c["reject_dangerous_t22"] is True
         assert c["max_dev_hold_pct"] == 15.0
         assert c["require_authorities_revoked"] is True

@@ -1,0 +1,52 @@
+{
+  "summary": "Iteration 14 retest of the 3 CRITICAL fail-open fixes + 2 minor items. Added /app/backend/tests/test_pumpfun_failclosed_it14.py (30 tests) that patches the on-chain helpers on a throw-away armed instance (cfg.enabled=True, stubbed LiveTrader, booby-trapped _pumpportal_build_tx/_sign_and_send) and asserts maybe_buy REJECTS. RESULT: 2 of 3 criticals are CLOSED (dev-hold: signature now required + 3-attempt retry then 'dev_hold_unverifiable' reject; _amt now raises so _check_holders_concentration returns ok:false 'holders lookup failed: ...'). The 3rd is STILL OPEN: maybe_buy() never converts holders.ok==false into a rejection - the buy proceeds to the PumpPortal build step (proved: booby-trapped build was actually reached). Both minor fixes verified (min_curve_sol default 0.01 in config/.env.example/API/UI; defaultAccountState removed from DANGEROUS_T22_EXTENSIONS and only flagged as 'defaultAccountState=Frozen' when state.accountState is frozen, case-insensitive; Initialized -> extensions_safe=true). Full backend suite 354/357 (2 failures = the open holders bug, 1 = pre-existing unreachable QuickNode RPC). Frontend PumpfunPanel renders with all 12 data-testids, 9 config items incl. 'Min curve SOL: 0.01', 0 console errors. No trading flag was enabled anywhere.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "pumpfun_autobuy.maybe_buy (holders concentration filter, lines 550-570)", "issue": "STILL FAIL-OPEN. The filter body is still wrapped in `if holders.get('ok'):` with no else-branch, so when _check_holders_concentration returns {ok:false} (RPC error, rate-limit, empty result, or the new _amt ValueError) the concentration check is silently skipped and execution falls through to _pumpportal_build_tx -> BUY. Reproduced by tests test_holders_unverifiable_rejects and test_amt_parse_failure_rejects_buy: reject reason came back as 'pumpportal build failed: <tripwire>' i.e. the build step was reached. No 'holders_unverifiable' string exists anywhere in pumpfun_autobuy.py. Fix: after the await, add `if not holders.get('ok'): rejects_safety+=1; last_reason=f\"holders_unverifiable: {holders.get('reason')}\"; record event; return {'ok':False,...}` (mirror the curve_read_fail block at line 534).", "priority": "CRITICAL"},
+      {"endpoint": "/api/live/rpc_ping", "issue": "Carried over: QuickNode host alpha-small-sheet.solana-mainnet.quiknode.pro is unreachable ({ok:false, rpc_reachable:false, error:'SolanaRpcException()'}). With the now-correct fail-closed curve/dev-hold paths this means zero buys can ever be evaluated on-chain. test_live_rpc_ping.py::test_rpc_ping_success_shape is red.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "pumpfun_autobuy.maybe_buy dev-hold retry", "issue": "Retry loop sleeps 1.5s after the 3rd (final) failed attempt too, adding ~1.5s of dead latency before the reject. Break out of the loop on the last iteration."},
+      {"endpoint": "/api/live/pumpfun/*", "issue": "Carried over: still return HTTP 200 with {\"error\": ...} bodies on handler failure instead of 5xx."},
+      {"endpoint": "pumpfun_autobuy lifecycle", "issue": "Carried over: aiohttp ClientSession from _http() never closed; monitor_positions() never cancelled on shutdown."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PumpfunPanel config strip", "issues": ["9 items still render as a ragged 5+4 grid with an empty trailing cell after 'TP/SL: advisory...'.", "'Min curve SOL: 0.01' still omits the 'SOL' unit suffix that sibling items use ('Buy: 0.002 SOL'), and 0.01 renders small/low-contrast (11px slate-400)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pumpfun_failclosed_it14.py",
+    "/app/backend/tests/test_pumpfun_antirug.py",
+    "/app/test_reports/pytest/failclosed_it14.xml",
+    "/app/test_reports/pytest/full_it14.xml"
+  ],
+  "action_items": [
+    "CRITICAL (unfixed): add the `if not holders.get('ok'): reject with 'holders_unverifiable: ...'` branch in maybe_buy() - the holders filter is still bypassed on any lookup failure and a buy is fired.",
+    "Fix/replace the dead SOLANA_RPC_URL (QuickNode host unreachable) so any on-chain filter can actually evaluate.",
+    "Skip the trailing 1.5s sleep on the final dev-hold retry attempt.",
+    "Carried over: 5xx instead of 200+{error} on the 4 pumpfun endpoints; close aiohttp session / cancel monitor task on shutdown; tidy the 9-item config strip grid and add the SOL unit to 'Min curve SOL'."
+  ],
+  "critical_code_review_comments": [
+    "CONFIRMED CLOSED - dev-hold: `if not signature -> 'dev_hold_unknown: no detection signature (cannot verify creator holdings)'` (hard reject, verified), 3-attempt retry loop verified by call-count (exactly 3 calls, and it exits early on a 2nd-attempt success), then 'dev_hold_unverifiable: <reason>' reject.",
+    "CONFIRMED CLOSED - _amt() now raises ValueError('holder entry has no amount: ...') for entries missing both uiTokenAmount.amount and top-level amount; the surrounding try/except converts it to {ok:false, reason:'holders lookup failed: ...'} with no top1/top10_within_limit keys. Verified with a patched _http returning a whale entry that only has uiAmountString.",
+    "STILL OPEN - the value of the strict _amt() is nullified because maybe_buy() ignores holders.ok==false. The two fixes must ship together or the parse-error path silently degrades to 'no concentration check' exactly as before.",
+    "defaultAccountState handling is correct and case-insensitive (Frozen/frozen/FROZEN all -> dangerous_extensions=['defaultAccountState=Frozen'], Initialized -> safe) and it also tolerates the alternate state.state / top-level accountState shapes.",
+    "Disabled-gate short-circuit re-verified with tripwires on all 4 filters + build + send: none were invoked; reason 'auto-buy disabled (PUMPFUN_AUTO_BUY_ENABLED=false)', buys_fired==0.",
+    "Carried over: the pool-ATA exclusion heuristic (`if len(non_pool)==len(accounts): non_pool = accounts[1:]`) still guesses that the largest holder is the pool on a money-moving safety filter - prefer an explicit fail-closed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pumpfun_failclosed_it14.py (new, 30 tests)",
+    "/app/backend/tests/test_pumpfun_antirug.py (updated 3 stale it13 expectations: min_curve_sol 0.5->0.01 in two places, defaultAccountState now asserted ABSENT from DANGEROUS_T22_EXTENSIONS)",
+    "/app/test_reports/iteration_14.json (new)"
+  ],
+  "success_rate": {"backend": "99.2% (354/357 pytest; 2 failures = the open holders fail-open bug, 1 = unreachable external RPC). New it14 suite: 28/30", "frontend": "100% (panel + 12 testids + 9 config items incl. Min curve SOL: 0.01, 0 console errors)"},
+  "seed_data_creation": "None. API tests are read-only; module tests use db=None and stubbed LiveTrader/HTTP so the real singleton and .env were never mutated.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest with `-p no:anchorpy`. The 2 red tests in /app/backend/tests/test_pumpfun_failclosed_it14.py (TestHoldersFailClosed::test_holders_unverifiable_rejects, TestAmtStrict::test_amt_parse_failure_rejects_buy) are the exact regression gate for the remaining CRITICAL - they will go green the moment maybe_buy rejects with a reason containing 'holders_unverifiable'. The pattern to arm an instance safely is _armed_buyer()+_patch() in that file. test_live_rpc_ping.py stays red until SOLANA_RPC_URL is valid. PumpPortal build/sign/send path remains untested by design.",
+  "rca_of_the_issue": "Only 2 of the 3 reported call-site fixes were actually applied. maybe_buy() lines 550-570 still read `holders = await self._check_holders_concentration(...)` followed by `if holders.get('ok'):` and the two limit checks - there is no not-ok branch, so a failed lookup degrades the filter from 'reject' to 'not evaluated' and control reaches the PumpPortal build/send path. Proof: with all other filters patched to pass and holders patched to {ok:false}, the reject reason returned was 'pumpportal build failed: <tripwire AssertionError>', i.e. the tripwire placed on _pumpportal_build_tx was hit. Mitigation: replicate the curve_read_fail block (line 534) for holders."
+}

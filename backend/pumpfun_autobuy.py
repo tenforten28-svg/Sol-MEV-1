@@ -57,11 +57,11 @@ ATA_PROGRAM = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
 DANGEROUS_T22_EXTENSIONS = {
     "transferFeeConfig",       # dev can drain via transfer fees
     "permanentDelegate",       # someone can take your tokens forever
-    "defaultAccountState",     # accounts default to frozen -> untradable
     "nonTransferable",         # you literally can't sell
     "transferHook",            # arbitrary program can block/steal your transfer
     "mintCloseAuthority",      # can close the mint entirely
 }
+# defaultAccountState is checked separately — only rejected if state == "Frozen"
 
 
 def _fbool(k, d=False):
@@ -111,7 +111,10 @@ class AutoBuyConfig:
         # Largest single non-pool holder must be <= this % of supply. Catches single-whale traps.
         self.max_holder_pct = _fflt("PUMPFUN_MAX_HOLDER_PCT", 20.0)
         # Minimum real SOL in the bonding curve — rejects illiquid dust launches.
-        self.min_curve_sol = _fflt("PUMPFUN_MIN_CURVE_SOL", 0.5)
+        # Fresh pump.fun mints start at ~0.01-0.03 SOL after the creator's initial buy;
+        # this default is essentially "is the curve initialized". Raise it if you want
+        # to snipe only launches that already have real buy volume.
+        self.min_curve_sol = _fflt("PUMPFUN_MIN_CURVE_SOL", 0.01)
         # Reject Token-2022 mints that have honeypot extensions (transfer fee, permanent delegate, etc.)
         self.reject_dangerous_t22 = _fbool("PUMPFUN_REJECT_DANGEROUS_T22", True)
 
@@ -185,10 +188,18 @@ class PumpFunAutoBuyer:
             dangerous_exts = []
             extensions = parsed.get("extensions") or []
             for ext in extensions:
-                if isinstance(ext, dict):
-                    name = ext.get("extension") or ext.get("type")
-                    if name in DANGEROUS_T22_EXTENSIONS:
-                        dangerous_exts.append(name)
+                if not isinstance(ext, dict):
+                    continue
+                name = ext.get("extension") or ext.get("type")
+                if name in DANGEROUS_T22_EXTENSIONS:
+                    dangerous_exts.append(name)
+                elif name == "defaultAccountState":
+                    # Only dangerous if accounts default to Frozen (untradable)
+                    state_val = ((ext.get("state") or {}).get("accountState")
+                                 or (ext.get("state") or {}).get("state")
+                                 or ext.get("accountState"))
+                    if isinstance(state_val, str) and state_val.lower() == "frozen":
+                        dangerous_exts.append("defaultAccountState=Frozen")
 
             return {
                 "ok": True,
@@ -306,13 +317,17 @@ class PumpFunAutoBuyer:
                 non_pool = accounts[1:]
 
             def _amt(a):
-                try:
-                    return int(((a.get("amount")) or (a.get("uiAmountString")) or "0"))
-                except Exception:
-                    try:
-                        return int((a.get("uiTokenAmount") or {}).get("amount") or 0)
-                    except Exception:
-                        return 0
+                """Extract the raw (integer, atomic) balance from a getTokenLargestAccounts
+                entry. Fail-CLOSED — if we can't parse, raise so the caller aborts."""
+                # Primary: uiTokenAmount.amount is a string of base units (integer)
+                ui_amt = a.get("uiTokenAmount") or {}
+                raw_amt = ui_amt.get("amount")
+                if raw_amt is None:
+                    # Older RPC shape puts `amount` at the top level as a stringified int
+                    raw_amt = a.get("amount")
+                if raw_amt is None:
+                    raise ValueError(f"holder entry has no amount: {a}")
+                return int(raw_amt)
 
             balances = [_amt(a) for a in non_pool[:10]]
             top1 = balances[0] if balances else 0
@@ -487,11 +502,28 @@ class PumpFunAutoBuyer:
             await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety})
             return {"ok": False, "reason": self.last_reason, "safety": safety}
 
-        # Dev-hold rug filter (if we have the mint tx signature)
+        # Dev-hold rug filter (STRICT: fail-closed — if we can't verify, we don't buy)
         dev = None
-        if signature and self.cfg.max_dev_hold_pct < 100.0:
-            dev = await self._check_dev_hold(signature, mint, safety.get("supply"))
-            if dev.get("ok") and not dev.get("within_limit"):
+        if self.cfg.max_dev_hold_pct < 100.0:
+            if not signature:
+                self.rejects_safety += 1
+                self.last_reason = "dev_hold_unknown: no detection signature (cannot verify creator holdings)"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety})
+                return {"ok": False, "reason": self.last_reason}
+            # Retry the tx fetch up to 3 times because getTransaction often returns null
+            # for the first few seconds after a fresh mint.
+            dev = None
+            for attempt in range(3):
+                dev = await self._check_dev_hold(signature, mint, safety.get("supply"))
+                if dev.get("ok"):
+                    break
+                await asyncio.sleep(1.5)
+            if not dev.get("ok"):
+                self.rejects_safety += 1
+                self.last_reason = f"dev_hold_unverifiable: {dev.get('reason')}"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev})
+                return {"ok": False, "reason": self.last_reason, "dev": dev}
+            if not dev.get("within_limit"):
                 self.rejects_safety += 1
                 self.last_reason = f"dev_hold_fail: {dev.get('dev_hold_pct')}% > {self.cfg.max_dev_hold_pct}% limit"
                 await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev})
