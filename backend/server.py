@@ -119,6 +119,15 @@ async def lifespan(app: FastAPI):
         logger.info("🎯 Pump.fun sniper initialized (detection only; enable with PUMPFUN_SNIPER_ENABLED=true)")
     except Exception as e:
         logger.exception(f"Failed to start pump.fun sniper: {e}")
+
+    # Start PUMP.FUN auto-buyer + position monitor
+    try:
+        from pumpfun_autobuy import get_pumpfun_autobuyer
+        pf_ab = get_pumpfun_autobuyer(db)
+        asyncio.create_task(pf_ab.monitor_positions())
+        logger.info("💊 Pump.fun auto-buyer initialized (enable with PUMPFUN_AUTO_BUY_ENABLED=true)")
+    except Exception as e:
+        logger.exception(f"Failed to start pump.fun autobuyer: {e}")
     
     logger.info("🚀 Solana MEV Arbitrage Bot started")
     logger.info("⚡ Flash Loan Monitor enabled")
@@ -367,6 +376,29 @@ async def pumpfun_detections(limit: int = 50):
         return {"count": len(docs), "detections": docs}
     except Exception as e:
         return {"count": 0, "detections": [], "error": str(e)}
+
+
+@api_router.get("/live/pumpfun/autobuy_status")
+async def pumpfun_autobuy_status():
+    from pumpfun_autobuy import get_pumpfun_autobuyer
+    try:
+        return get_pumpfun_autobuyer(db).status()
+    except Exception as e:
+        return {"error": str(e), "enabled": False}
+
+
+@api_router.get("/live/pumpfun/positions")
+async def pumpfun_positions(limit: int = 50):
+    """Recent open/close events for pump.fun snipe positions."""
+    try:
+        cursor = db.pumpfun_positions.find({}).sort("at", -1).limit(limit)
+        docs = []
+        async for d in cursor:
+            d.pop("_id", None)
+            docs.append(d)
+        return {"count": len(docs), "events": docs}
+    except Exception as e:
+        return {"count": 0, "events": [], "error": str(e)}
 
 
 @api_router.get("/bot_diagnostic")

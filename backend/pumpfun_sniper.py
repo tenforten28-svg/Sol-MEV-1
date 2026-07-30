@@ -154,6 +154,15 @@ class PumpFunSniper:
 
             logger.info(f"[pumpfun] NEW MINT #{self.detections} → {candidate_mint or 'unknown'} (sig={sig[:8] if sig else '?'})")
 
+            # If auto-buy is enabled, fire the buy in a background task so we don't block the WSS loop
+            if candidate_mint:
+                try:
+                    from pumpfun_autobuy import get_pumpfun_autobuyer
+                    ab = get_pumpfun_autobuyer(self.db)
+                    asyncio.create_task(ab.maybe_buy(candidate_mint))
+                except Exception as e:
+                    logger.debug(f"[pumpfun] autobuy trigger failed: {e}")
+
         except Exception as e:
             logger.debug(f"[pumpfun] parse error: {e}")
 
