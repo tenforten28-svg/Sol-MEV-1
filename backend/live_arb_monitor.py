@@ -114,7 +114,9 @@ class LiveArbMonitor:
 
         # Preflight — abort scan if live_trader isn't fully ready
         if not self.lt.ready:
-            await self._record_decision("skipped", None, "live_trader not ready", None)
+            self.last_decision = await self._record_decision(
+                "skipped", None, "live_trader not ready", None
+            )
             return
 
         for (start_sym, mid_sym) in self.cfg.pairs:
@@ -194,8 +196,30 @@ class LiveArbMonitor:
                 MINTS[mid_sym], MINTS[start_sym], leg1_actual_out
             )
 
+            # UNWIND — if leg2 failed we're stuck with the middle token. Retry once.
+            unwind_result = None
+            if not leg2_result.get("success"):
+                logger.warning(f"[arb_monitor] leg2 failed — attempting unwind retry for {pair_label}")
+                await asyncio.sleep(2)  # brief cooldown before retry
+                unwind_result = await self.lt.execute_swap(
+                    MINTS[mid_sym], MINTS[start_sym], leg1_actual_out
+                )
+                if unwind_result.get("success"):
+                    leg2_result = unwind_result  # treat unwind as the completed leg2
+                    logger.info(f"[arb_monitor] unwind succeeded for {pair_label}")
+
             # Record both trades regardless
             realized_final = int(leg2_result.get("out_amount") or 0) if leg2_result.get("success") else 0
+
+            # Deduct approximate on-chain costs from PnL calculation.
+            # Solana base fee ~ 0.000005 SOL/tx (2 txs = ~$0.0015).
+            # Jito tip (if used) is charged per leg.
+            leg1_tip = int(leg1_result.get("jito_tip_lamports") or 0)
+            leg2_tip = int(leg2_result.get("jito_tip_lamports") or 0)
+            total_tip_lamports = leg1_tip + leg2_tip
+            approx_gas_lamports = 10_000  # ~2 base tx fees (5000 each)
+            fee_sol = (total_tip_lamports + approx_gas_lamports) / 1_000_000_000
+
             # Convert to USD PnL (rough — treats stables as $1, SOL as $150)
             def base_to_usd(sym: str, base_units: int) -> float:
                 d = DECIMALS[sym]
@@ -207,7 +231,8 @@ class LiveArbMonitor:
 
             start_usd = base_to_usd(start_sym, start_base)
             realized_usd = base_to_usd(start_sym, realized_final)
-            pnl_usd = round(realized_usd - start_usd, 6)
+            fee_usd = fee_sol * 150.0  # SOL price estimate
+            pnl_usd = round(realized_usd - start_usd - fee_usd, 6)
 
             self.lt.risk.record_trade(pnl_usd)
             self.total_fired += 1
@@ -218,11 +243,15 @@ class LiveArbMonitor:
             trade_doc = {
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "pair": pair_label,
-                "type": "live_auto_arb",
+                "type": "live_auto_arb" if leg2_result.get("success") else "live_auto_arb_stuck",
                 "amount_usd": self.cfg.trade_size_usd,
                 "expected_profit_bps": info["profit_bps"],
                 "realized_pnl_usd": pnl_usd,
+                "fees_deducted_usd": round(fee_usd, 6),
+                "unwind_attempted": unwind_result is not None,
+                "unwind_succeeded": bool(unwind_result and unwind_result.get("success")),
                 "success": bool(leg1_result.get("success") and leg2_result.get("success")),
+                "jito_tip_lamports": total_tip_lamports,
                 "leg1": {
                     "signature": leg1_result.get("signature"),
                     "success": leg1_result.get("success"),

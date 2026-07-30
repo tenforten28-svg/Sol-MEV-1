@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 7 backend-only verification of the 3 applied improvements in live_arb_monitor.py. Created /app/backend/tests/test_arb_unwind_fees.py (10 new tests) using a fake LiveTrader/FakeDB harness so _evaluate_pair and _scan_once run for real (no network; Jupiter DNS is blocked in sandbox). Verified: (1) UNWIND — leg2 failure triggers exactly ONE retry (3rd execute_swap call, same mid->start direction and leg1_actual_out amount) after a 2s sleep; when the retry succeeds the trade is recorded as type 'live_auto_arb' with leg2.signature = unwind signature, unwind_attempted=True, unwind_succeeded=True; when the retry also fails the doc is type 'live_auto_arb_stuck', success=False, unwind_succeeded=False. leg1 failure path does NOT trigger an unwind and writes no trade doc. (2) FEES — new fields fees_deducted_usd (float), unwind_attempted/unwind_succeeded (bool), jito_tip_lamports (int, leg1+leg2 sum) exist on the doc; fee math verified numerically: (50000 tips + 10000 gas)/1e9 * 150 = 0.009 USD and pnl_usd = round(realized - start - fee, 6) matched exactly, and risk.record_trade received the fee-deducted PnL. (3) last_decision — _scan_once now assigns self.last_decision on the 'live_trader not ready' skip (verified by calling _scan_once on an instance with lt.ready=False: verdict='skipped', reason contains 'not ready', decision persisted, no trade doc). API: seeded live_auto_arb_stuck (stuck_sig_x) is excluded from GET /api/live/trades and from GET /api/live/summary today aggregates, while live_auto_arb (normal_sig_y) appears with fees_deducted_usd intact and total_jito_tips_sol correctly reflecting 40000 lamports; both seeds cleaned up and removal re-verified. Full regression suite: 189/189 PASS (179 prior + 10 new).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "live_arb_monitor._evaluate_pair", "issue": "Unwind retry does not verify whether the failed leg2 transaction actually landed on-chain (failure may be a timeout/confirmation error). Retrying blindly can attempt a second sell of tokens already sold, wasting fees or producing an unintended swap. Consider confirming the leg2 signature (if present) before retrying."},
+      {"endpoint": "live_arb_monitor._evaluate_pair", "issue": "When the unwind also fails, the tip lamports spent on the unwind attempt are dropped (total_tip_lamports uses leg2_result which is still the failed leg2 dict), so fees_deducted_usd under-reports the true cost of stuck trades."},
+      {"endpoint": "live_arb_monitor._evaluate_pair", "issue": "Stuck trades still record realized_final=0, so PnL is booked as -100% of the notional (-$1.0015 for a $1 trade) even though the wallet still holds the mid token. This over-penalises risk.record_trade / daily-loss breaker. Value the retained mid-token position instead."},
+      {"endpoint": "GET /api/live/trades", "issue": "live_auto_arb_stuck trades are (correctly) excluded from normal trade lists/summary, but NO endpoint surfaces them, so a user has zero visibility that the wallet is stuck mid-token. Add a stuck-positions field to /api/live/auto_arb/status or a dedicated endpoint."},
+      {"endpoint": "live_arb_monitor._evaluate_pair", "issue": "total_fired is incremented for stuck trades too, so trades_fired includes half-completed round trips without any counter for stuck ones."},
+      {"endpoint": "live_arb_monitor", "issue": "Carried over from iteration 6 and still open: hardcoded SOL=150.0 / JUP=0.5 prices drive both sizing and the new fee_usd/PnL conversion; the arb_decisions cap still does count_documents + per-doc deletes each cycle; start() after stop() cannot restart the loop."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_arb_unwind_fees.py",
+    "/app/backend/tests/test_auto_arb_monitor.py",
+    "/app/test_reports/pytest/iteration7.xml"
+  ],
+  "action_items": [
+    "Confirm the leg2 signature status (or require an explicit non-landed error) before issuing the unwind retry to avoid a duplicate sell.",
+    "Include unwind-attempt tip lamports in total_tip_lamports/fees_deducted_usd when the unwind fails.",
+    "Value the retained mid-token when recording PnL for live_auto_arb_stuck instead of assuming a total loss.",
+    "Expose stuck positions (count/latest) on /api/live/auto_arb/status so the user can see a mid-token exposure."
+  ],
+  "critical_code_review_comments": [
+    "The unwind retry reuses leg1_actual_out unconditionally; if the token balance changed (partial fill or landed-but-unconfirmed leg2) the retry will fail or oversell. Read the actual mid-token account balance before retrying.",
+    "Only one retry with a fixed 2s sleep; for a real stuck position an escalating retry/alert path (or a manual unwind endpoint) is needed.",
+    "server.py is 1211 lines — split live-trading/auto-arb endpoints into a router module; the ['live_manual_swap','live_auto_arb'] type filter is duplicated in /api/live/trades and /api/live/summary and should be a shared constant so a future type is not missed in one place."
+  ],
+  "updated_files": ["/app/backend/tests/test_arb_unwind_fees.py"],
+  "success_rate": {"backend": "100% (189/189 pytest)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Temporary db.trades docs (_test_marker=TEST_ITER7: stuck_sig_x, normal_sig_y) — deleted and verified removed. Monitor unit tests used an in-memory FakeDB, no Mongo writes.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "/app/memory/test_credentials.md is empty (no auth in this app; not required)",
+  "context_for_next_testing_agent": "All 3 iteration-6 improvements are implemented and verified. New harness in tests/test_arb_unwind_fees.py (FakeTrader/FakeJupiter/FakeDB + _make_monitor) lets you execute _evaluate_pair/_scan_once without network — reuse it for any further monitor logic. Run pytest with -p no:anchorpy from /app/backend. AUTO_ARB_ENABLED remains unset so the monitor never runs and last_decision stays null on the live status endpoint (expected). Open items are all minor/robustness (see backend_issues.minor).",
+  "rca_of_the_issue": "No defects reproduced in this iteration; all listed items are robustness gaps found by executing the new code paths with mocked leg results and by static review."
+}
