@@ -167,10 +167,8 @@ def test_live_status(api):
     assert "ready" in d and "wallet_configured" in d
 
 
-@pytest.mark.xfail(reason="KNOWN ISSUE (iteration 4): /api/live/balance omits rpc_ok in the "
-                          "wallet-not-configured early-return branch -> inconsistent response shape",
-                   strict=False)
 def test_live_balance_has_rpc_ok(api):
+    # iteration 5: fixed — rpc_ok/meets_reserve now present in the unconfigured branch
     r = api.get(f"{BASE_URL}/api/live/balance", timeout=45)
     assert r.status_code == 200
     d = r.json()

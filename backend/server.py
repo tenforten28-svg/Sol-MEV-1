@@ -264,7 +264,8 @@ async def live_balance():
     lt = get_live_trader()
     if not lt.wallet_configured:
         return {"ready": False, "wallet_configured": False,
-                "reason": "SOLANA_PRIVATE_KEY or SOLANA_RPC_URL not set", "sol": 0.0}
+                "reason": "SOLANA_PRIVATE_KEY or SOLANA_RPC_URL not set",
+                "sol": 0.0, "rpc_ok": False, "meets_reserve": False}
     # Do a real RPC call and surface any error explicitly
     try:
         async with AsyncClient(lt.cfg.rpc_url) as client:
@@ -370,11 +371,19 @@ async def bot_diagnostic():
         reasons_no_live_trades.append(
             "live_trader.ready=false — see /api/live/status for detail"
         )
-    if live_trades_24h == 0:
+    # ALWAYS append the auto-exec message — even after the user does their first
+    # manual swap, they still need to understand the bot won't autonomously fire.
+    reasons_no_live_trades.append(
+        "IMPORTANT: the bot does NOT auto-fire real trades yet — auto-execution "
+        "is NOT wired into the arbitrage monitor. You must POST /api/live/test_swap "
+        "manually to trigger a real trade. This is a deliberate safety choice."
+    )
+    # Warn if mongo auto_execute is true (users often set it thinking it enables live)
+    if mongo_auto_execute:
         reasons_no_live_trades.append(
-            "IMPORTANT: the bot does NOT auto-fire real trades yet — auto-execution "
-            "is NOT wired into the arbitrage monitor. You must POST /api/live/test_swap "
-            "manually to trigger a real trade. This is a deliberate safety choice."
+            "NOTE: mongo_config.auto_execute=true only affects SIMULATED fills "
+            "(the sim bot writing fake trade records). It does NOT trigger real "
+            "on-chain swaps. Real swaps only happen via /api/live/test_swap."
         )
 
     return {
