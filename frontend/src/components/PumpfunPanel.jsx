@@ -156,12 +156,15 @@ export default function PumpfunPanel() {
 
       {/* Config strip */}
       <div className="text-[11px] text-slate-400 bg-slate-900/60 border border-slate-800 rounded-md p-3 mb-5">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
           <div>Buy: <span className="text-fuchsia-300">{cfg.buy_sol ?? "—"} SOL</span></div>
           <div>Slippage: <span className="text-fuchsia-300">{cfg.slippage_pct ?? "—"}%</span></div>
           <div>Max dev hold: <span className="text-fuchsia-300">{cfg.max_dev_hold_pct ?? "—"}%</span></div>
+          <div>Max top-1 / top-10: <span className="text-fuchsia-300">{cfg.max_holder_pct ?? "—"}% / {cfg.max_top10_pct ?? "—"}%</span></div>
+          <div>Min curve SOL: <span className="text-fuchsia-300">{cfg.min_curve_sol ?? "—"}</span></div>
           <div>Priority fee: <span className="text-fuchsia-300">{cfg.priority_fee_sol ?? "—"} SOL</span></div>
           <div>Hold max: <span className="text-fuchsia-300">{cfg.hold_max_seconds ?? "—"}s</span></div>
+          <div>T22 rug ext: <span className="text-fuchsia-300">{cfg.reject_dangerous_t22 ? "reject" : "allow"}</span></div>
           <div>TP/SL: <span className="text-slate-400">advisory ({cfg.take_profit_mult ?? "—"}x / {cfg.stop_loss_mult ?? "—"}x, time-limit only)</span></div>
         </div>
         {autobuy?.last_reason && (
@@ -274,10 +277,39 @@ export default function PumpfunPanel() {
                 {p.buy_sol != null && <span>buy: {p.buy_sol} SOL</span>}
                 {p.dev?.dev_hold_pct != null && (
                   <span>
-                    dev holds:{" "}
+                    dev:{" "}
                     <span className={p.dev.within_limit ? "text-emerald-300" : "text-red-300"}>
                       {p.dev.dev_hold_pct}%
                     </span>
+                  </span>
+                )}
+                {p.holders?.top1_pct != null && (
+                  <span>
+                    top1:{" "}
+                    <span className={p.holders.top1_within_limit ? "text-emerald-300" : "text-red-300"}>
+                      {p.holders.top1_pct}%
+                    </span>
+                  </span>
+                )}
+                {p.holders?.top10_pct != null && (
+                  <span>
+                    top10:{" "}
+                    <span className={p.holders.top10_within_limit ? "text-emerald-300" : "text-red-300"}>
+                      {p.holders.top10_pct}%
+                    </span>
+                  </span>
+                )}
+                {p.curve?.real_sol_reserves != null && (
+                  <span>
+                    curve:{" "}
+                    <span className={p.curve.liquidity_ok ? "text-emerald-300" : "text-red-300"}>
+                      {p.curve.real_sol_reserves} SOL
+                    </span>
+                  </span>
+                )}
+                {p.safety?.dangerous_extensions?.length > 0 && (
+                  <span className="text-red-300">
+                    t22-ext: {p.safety.dangerous_extensions.join(",")}
                   </span>
                 )}
                 {p.hold_seconds != null && <span>held: {Math.round(p.hold_seconds)}s</span>}

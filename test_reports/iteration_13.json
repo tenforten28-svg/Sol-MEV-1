@@ -1,0 +1,58 @@
+{
+  "summary": "Iteration 13: tested the new Pump.fun anti-rug filter suite. Added /app/backend/tests/test_pumpfun_antirug.py (30 tests: module surface/constants, known-vector bonding-curve PDA + pool ATA derivation, new config defaults, .env.example documentation, fail-closed behaviour of all 4 on-chain helpers under both 'no rpc' and dead-RPC/exception paths, maybe_buy disabled-gate short-circuit with a booby-trapped _pumpportal_build_tx, and API exposure of the 4 new config keys). Full backend suite: 326/327 passing (1 pre-existing external failure: QuickNode RPC unreachable). Frontend: 24/24 UI assertions passed - pumpfun-panel, both badges (Detector: OFF / Auto-Buy: SAFE), all 6 stat tiles, all 9 config-strip items incl. the 4 new ones, both lists, LiveTradingPanel intact, zero console errors, stable across a poll cycle. NO trading flag was enabled; PumpPortal was never called (verified by raising AssertionError inside a patched _pumpportal_build_tx - never hit). KEY FINDING: the claim 'All fail-closed' is NOT true for 2 of the 5 filters - see backend_issues.critical.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "pumpfun_autobuy.maybe_buy (holders concentration filter, lines ~518-538)", "issue": "FAIL-OPEN: the top-1/top-10 concentration filter is only enforced inside `if holders.get('ok'):`. _check_holders_concentration() correctly returns {ok:False,...} when the RPC is unreachable/rate-limited/returns empty, but maybe_buy() then silently SKIPS the check and proceeds to buy. A getTokenLargestAccounts failure therefore disables the holder-concentration rug filter entirely instead of rejecting. Must mirror the curve check: `if not holders.get('ok'): reject`.", "priority": "CRITICAL"},
+      {"endpoint": "pumpfun_autobuy.maybe_buy (dev-hold filter, lines ~490-498)", "issue": "FAIL-OPEN: same pattern - `if dev.get('ok') and not dev.get('within_limit')`. The mint tx is frequently not yet confirmed at snipe time (_check_dev_hold returns ok:False 'tx not found'), and the buy proceeds with the dev-hold rug filter unevaluated. Also, if `signature` is None the filter is skipped completely with no rejection.", "priority": "CRITICAL"},
+      {"endpoint": "pumpfun_autobuy._check_holders_concentration._amt (lines ~308-315)", "issue": "FAIL-OPEN on parse error: _amt() returns 0 for any account whose amount cannot be int()-parsed (e.g. the uiAmountString fallback '1234.56' raises, then the uiTokenAmount fallback is absent -> 0). An unparsable whale is counted as 0% of supply and passes the concentration limit. Should raise/propagate so the filter fails closed."},
+      {"endpoint": "/api/live/rpc_ping (and all on-chain filters)", "issue": "Configured QuickNode RPC host alpha-small-sheet.solana-mainnet.quiknode.pro is UNREACHABLE ({ok:false, rpc_reachable:false, error:'SolanaRpcException()'}). Consequence: every new anti-rug filter would fail (curve check fails closed -> zero buys ever; holders/dev-hold fail OPEN per above). Reproduced by test_live_rpc_ping.py::test_rpc_ping_success_shape (the only failing test in the suite). Needs a valid SOLANA_RPC_URL.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "pumpfun_autobuy.AutoBuyConfig.min_curve_sol", "issue": "Default min_curve_sol=0.5 rejects essentially every brand-new pump.fun mint: real_sol_reserves starts near 0 and only crosses 0.5 SOL after meaningful buy volume. Combined with settle_delay_sec=4 this makes the 'sniper' structurally unable to enter early. Confirm the trade-off is intended."},
+      {"endpoint": "pumpfun_autobuy.DANGEROUS_T22_EXTENSIONS", "issue": "'defaultAccountState' is rejected unconditionally, not only when state == 'Frozen' as specified in the requirement. Stricter (safe) but broader than documented; the extension's `state` value is never inspected."},
+      {"endpoint": "/api/live/pumpfun/status|detections|autobuy_status|positions", "issue": "Still return HTTP 200 with an {\"error\": ...} body on handler failure instead of 5xx (carried over from iteration 12)."},
+      {"endpoint": "pumpfun_autobuy lifecycle", "issue": "aiohttp ClientSession from _http() is still never closed and monitor_positions() is never cancelled on shutdown (carried over from iteration 12)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PumpfunPanel config strip", "issues": ["9 items in a lg:grid-cols-5 grid produce a ragged 5+4 layout with a visually empty cell after 'TP/SL: advisory...'; grid-cols-3 or an explicit ordering would read better.", "Config labels are text-slate-400 at 11px on slate-900/60 - legible but at the lower bound of comfortable contrast; the 10px slate-500 footer disclaimer remains borderline (carried over from iteration 12).", "'Min curve SOL: 0.5' omits the unit suffix used by sibling items ('SOL'), reading inconsistently next to 'Buy: 0.002 SOL'."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pumpfun_antirug.py",
+    "/app/backend/tests/test_pumpfun_autobuy_api.py",
+    "/app/test_reports/pytest/antirug_it13.xml",
+    "/app/test_reports/pytest/full_it13.xml"
+  ],
+  "action_items": [
+    "CRITICAL: make the holders-concentration filter fail CLOSED in maybe_buy() - reject when _check_holders_concentration returns ok:False (currently the buy proceeds).",
+    "CRITICAL: make the dev-hold filter fail CLOSED - reject when _check_dev_hold returns ok:False, and reject (or retry) when `signature` is missing so the filter is never silently skipped.",
+    "Make _amt() propagate parse failures (or return None -> reject) instead of defaulting a holder balance to 0, which currently passes the concentration limit.",
+    "Fix/replace the dead QuickNode RPC URL - /api/live/rpc_ping returns rpc_reachable:false, so no on-chain filter can actually evaluate.",
+    "Inspect the defaultAccountState extension's `state` field and only reject when it is Frozen, per spec.",
+    "Re-validate the min_curve_sol=0.5 default against real pump.fun launch curves (fresh mints have ~0 real SOL reserves and will always be rejected).",
+    "Carried over: return 5xx from the 4 pumpfun endpoints instead of 200+{error}; close aiohttp session / cancel monitor task on shutdown; implement or clearly de-advertise TP/SL.",
+    "Tidy the 9-item config strip grid (ragged 5+4 layout)."
+  ],
+  "critical_code_review_comments": [
+    "The 5 filters are NOT uniformly fail-closed. Verified by test: the 4 helper coroutines each return {ok:False, reason:...} on 'no rpc' and on exception (dead RPC) - correct. But maybe_buy() only converts that into a rejection for the curve check; the dev-hold and holders checks are wrapped in `if X.get('ok')` and are skipped on failure. That is the highest-severity gap in this change set.",
+    "SAFETY RE-VERIFIED: maybe_buy()'s first conditional remains `if not self.cfg.enabled` returning {'ok': False, 'reason': 'auto-buy disabled (PUMPFUN_AUTO_BUY_ENABLED=false)'}. A direct invocation with a patched _pumpportal_build_tx that raises on call confirmed it is never reached, attempts==1, buys_fired==0, no outbound request.",
+    "PDA derivation verified against the supplied known vectors: _bonding_curve_pda('2qEHjD..pump') == 2JUXSuq1A1EdBzZj757cXFYuALPxv6vee4X981ajpzo8 and _bonding_curve_ata(..., is_token_2022=False) == 7a7EGMd1moVtGsUJuJAgbaqW2zi7e91Phu7dakkFoHna. Deterministic across calls; the Token-2022 variant correctly derives a different ATA.",
+    "_check_curve_state layout math is correct (5x u64 from raw[8:48] + complete flag at raw[48], guarded by len(raw) >= 49) and rejects graduated curves via complete==True plus liquidity_ok = real_sol >= min_curve_sol and not complete.",
+    "The pool-ATA exclusion heuristic (`if len(non_pool) == len(accounts): non_pool = accounts[1:]`) silently assumes the largest holder is the pool. If the real pool ATA is absent from the top-20 for any reason this drops a genuine whale from the concentration math - prefer an explicit failure over a heuristic on a money-moving safety filter.",
+    "getTokenLargestAccounts only returns the top 20 accounts, so top-10 concentration is an upper-bound approximation only; acceptable, but worth a code comment."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pumpfun_antirug.py (new, 30 tests)",
+    "/app/test_reports/iteration_13.json (new)"
+  ],
+  "success_rate": {"backend": "99.7% (326/327 pytest; the single failure is the unreachable external QuickNode RPC. New anti-rug suite: 30/30)", "frontend": "100% (24/24 UI assertions, 0 console errors)"},
+  "seed_data_creation": "None. All tests are read-only against the API; the direct module tests use db=None (position-event writes are swallowed by the existing try/except) and a stubbed LiveTrader so the real singleton and .env were never mutated.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest with `-p no:anchorpy`. New suite: /app/backend/tests/test_pumpfun_antirug.py (30 tests). Helper-level fail-closed behaviour is fully covered there; the OPEN gap is at the maybe_buy() call sites for dev-hold and holders - after the main agent fixes it, add a test that forces cfg.enabled=True on a throw-away instance with a stubbed LiveTrader (SimpleNamespace(ready=True, cfg=SimpleNamespace(rpc_url=DEAD_RPC))) and asserts the reject reason is holders_read_fail / dev_read_fail. Note LiveTrader.ready is a read-only property, so it must be stubbed, not assigned. The PumpPortal build/sign/send path stays untested by design. /api/live/rpc_ping is red in this environment - any test that needs real on-chain data will fail until the RPC URL is fixed.",
+  "rca_of_the_issue": "The new helpers were written fail-closed (each returns {ok:False, reason} on missing RPC or exception - proven by 9 dedicated tests), but only the bonding-curve check has a corresponding `if not curve.get('ok'): reject` at the call site in maybe_buy(). The dev-hold and holders filters kept the pre-existing `if X.get('ok') and not X.get('within_limit')` shape, so an RPC failure degrades them from 'reject' to 'not evaluated'. Reproduction: point SOLANA_RPC_URL at an unreachable host (already the case in this environment), call maybe_buy on an enabled instance - the curve check fires first and masks the problem today, but if the curve read ever succeeds while getTokenLargestAccounts fails (a common QuickNode rate-limit pattern), a concentrated-holder rug would be bought. Mitigation: add explicit not-ok rejections at both call sites."
+}
