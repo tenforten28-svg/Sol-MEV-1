@@ -1,0 +1,35 @@
+{
+  "summary": "Backend-only retest of Pump.fun anti-rug fail-closed behavior. Confirmed the holders-concentration fail-closed patch is now present in /app/backend/pumpfun_autobuy.py (line ~558 `if not holders.get('ok'):` -> reject 'holders_unverifiable: ...'). Full regression of test_pumpfun_antirug.py + test_pumpfun_failclosed_it14.py = 60/60 PASSED (no regression). All 3 iteration-13 criticals (holders fail-open, dev-hold fail-open, _amt strict parse) are CLOSED. Wrote an independent verification suite (test_pumpfun_failclosed_it15.py, 19 tests) that COUNTS _pumpportal_build_tx/_sign_and_send calls instead of raising: verified 0 build/0 send + buys_fired==0 for simulated RPC-down and for the real (unpatched) _check_holders_concentration against malformed RPC payloads. That independent suite uncovered ONE residual fail-open edge case (see backend_issues.critical). 13/13 API endpoints returned 200 (incl. /api/live/auto_arb/decisions). Frontend skipped per request.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "pumpfun_autobuy._check_holders_concentration / maybe_buy",
+        "issue": "RESIDUAL FAIL-OPEN: when getTokenLargestAccounts returns a JSON-RPC error object (no 'result') or an empty 'value' list, the helper computes balances=[] -> top1_pct=0.0, top10_pct=0.0 and returns ok=True with top1_within_limit/top10_within_limit True. maybe_buy therefore PASSES the holder gate and FIRES the buy (verified: build_tx called 1x, res.ok=True) even though holder concentration was never verified. Fix: return {ok:False, reason:'no holder accounts returned'} when 'result' is missing/data.get('error') present, or when non_pool balances list is empty.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_pumpfun_failclosed_it15.py",
+    "/app/backend/tests/test_pumpfun_failclosed_it14.py",
+    "/app/backend/tests/test_pumpfun_antirug.py",
+    "/app/test_reports/pytest/pumpfun_it15.xml"
+  ],
+  "action_items": [
+    "Make _check_holders_concentration fail-closed for empty/error RPC responses: treat missing 'result', present 'error', or an empty non-pool holder list as unverifiable (ok=False) so maybe_buy rejects with holders_unverifiable.",
+    "After the fix, re-run: pytest tests/test_pumpfun_antirug.py tests/test_pumpfun_failclosed_it14.py tests/test_pumpfun_failclosed_it15.py -p no:anchorpy (expect 79/79)."
+  ],
+  "critical_code_review_comments": [
+    "maybe_buy() does not wrap _check_holders_concentration / _check_dev_hold / _check_curve_state in try/except; an unexpected exception propagates out of maybe_buy. That is fail-closed (no buy) but the caller must handle it — confirm the sniper loop catches it and records a rejection event.",
+    "Concentration percentages derived from an empty balances list default to 0% — any 'absence of data == safe' default in a safety gate is inherently fail-open and should be explicitly rejected."
+  ],
+  "updated_files": ["/app/backend/tests/test_pumpfun_failclosed_it15.py"],
+  "success_rate": {"backend": "97% (77/79 tests; 60/60 of the requested regression suite passed)", "frontend": "not tested (skipped per request)"},
+  "seed_data_creation": "None. No live gates enabled; all buyer instances were throw-away with stubbed live_trader and a dead RPC (127.0.0.1:1). Real singleton/.env untouched.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Requested criticals are all closed and 60/60 regression passes. Only open item is the empty/error holder-list fail-open in _check_holders_concentration, encoded as the 2 failing params (rpc_error_object, empty_holder_list) in test_pumpfun_failclosed_it15.py. Run pytest with -p no:anchorpy. /api/live/rpc_ping failure is expected in this preview env and was skipped.",
+  "rca_of_the_issue": "_check_holders_concentration extracts accounts = ((data.get('result') or {}).get('value') or []). When the RPC errors or returns no accounts, this silently yields an empty list; top1/top10 sums are then 0, which compares as within limits, so ok=True is returned and the anti-rug holder gate is effectively bypassed. Reproduce: stub _http() to return a session whose post() yields {'error': {...}} or {'result':{'value':[]}} and call maybe_buy on an armed instance — the buy fires."
+}

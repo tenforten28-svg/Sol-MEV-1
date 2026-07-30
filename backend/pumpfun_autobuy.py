@@ -547,7 +547,7 @@ class PumpFunAutoBuyer:
             await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev, "curve": curve})
             return {"ok": False, "reason": self.last_reason, "curve": curve}
 
-        # Top-holder concentration filter
+        # Top-holder concentration filter (STRICT: fail-closed)
         holders = None
         if self.cfg.max_top10_pct < 100.0 or self.cfg.max_holder_pct < 100.0:
             try:
@@ -557,17 +557,21 @@ class PumpFunAutoBuyer:
             holders = await self._check_holders_concentration(
                 mint, supply_int, bool(safety.get("is_token_2022"))
             )
-            if holders.get("ok"):
-                if not holders.get("top1_within_limit"):
-                    self.rejects_safety += 1
-                    self.last_reason = f"top1_holder_fail: {holders.get('top1_pct')}% > {self.cfg.max_holder_pct}% limit"
-                    await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev, "curve": curve, "holders": holders})
-                    return {"ok": False, "reason": self.last_reason, "holders": holders}
-                if not holders.get("top10_within_limit"):
-                    self.rejects_safety += 1
-                    self.last_reason = f"top10_holders_fail: {holders.get('top10_pct')}% > {self.cfg.max_top10_pct}% limit"
-                    await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev, "curve": curve, "holders": holders})
-                    return {"ok": False, "reason": self.last_reason, "holders": holders}
+            if not holders.get("ok"):
+                self.rejects_safety += 1
+                self.last_reason = f"holders_unverifiable: {holders.get('reason')}"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev, "curve": curve, "holders": holders})
+                return {"ok": False, "reason": self.last_reason, "holders": holders}
+            if not holders.get("top1_within_limit"):
+                self.rejects_safety += 1
+                self.last_reason = f"top1_holder_fail: {holders.get('top1_pct')}% > {self.cfg.max_holder_pct}% limit"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev, "curve": curve, "holders": holders})
+                return {"ok": False, "reason": self.last_reason, "holders": holders}
+            if not holders.get("top10_within_limit"):
+                self.rejects_safety += 1
+                self.last_reason = f"top10_holders_fail: {holders.get('top10_pct')}% > {self.cfg.max_top10_pct}% limit"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev, "curve": curve, "holders": holders})
+                return {"ok": False, "reason": self.last_reason, "holders": holders}
 
         # Build tx via pumpportal
         try:
