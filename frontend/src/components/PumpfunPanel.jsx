@@ -5,10 +5,10 @@ import { Badge } from "./ui/badge";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-const Stat = ({ label, value, sub, testId, tone = "slate" }) => (
+const Stat = ({ label, value, sub, testId }) => (
   <div
     data-testid={testId}
-    className={`bg-slate-900/60 border border-${tone}-800 rounded-lg p-3`}
+    className="bg-slate-900/60 border border-slate-800 rounded-lg p-3"
   >
     <div className="text-[10px] uppercase tracking-widest text-slate-400">{label}</div>
     <div className="text-lg font-semibold text-white mt-1">{value}</div>
@@ -161,7 +161,7 @@ export default function PumpfunPanel() {
           <div>Slippage: <span className="text-fuchsia-300">{cfg.slippage_pct ?? "—"}%</span></div>
           <div>Priority fee: <span className="text-fuchsia-300">{cfg.priority_fee_sol ?? "—"} SOL</span></div>
           <div>Hold max: <span className="text-fuchsia-300">{cfg.hold_max_seconds ?? "—"}s</span></div>
-          <div>TP/SL: <span className="text-fuchsia-300">{cfg.take_profit_mult ?? "—"}x / {cfg.stop_loss_mult ?? "—"}x</span></div>
+          <div>TP/SL: <span className="text-slate-400">advisory ({cfg.take_profit_mult ?? "—"}x / {cfg.stop_loss_mult ?? "—"}x, time-limit only)</span></div>
         </div>
         {autobuy?.last_reason && (
           <div className="mt-2 text-slate-500">

@@ -325,13 +325,12 @@ class PumpFunAutoBuyer:
                 logger.warning(f"[pumpfun-monitor] loop error: {e}")
 
     async def _evaluate_position(self, pos: Position) -> Optional[str]:
+        """Only time-based exit is enforced on-chain. TP/SL config is advisory in this
+        version (price-based exits require bonding-curve account decoding which we
+        deliberately skip to keep this path minimal). See status().tp_sl_enforced."""
         age = time.time() - pos.opened_at
         if age >= self.cfg.hold_max_seconds:
             return "time_limit"
-        # Price-based exits require a sell-quote from pumpportal (below).
-        # For simplicity/robustness on-chain, we only enforce time_limit here;
-        # TP/SL are enforced when the user extends this method (kept as-is to
-        # avoid rate-limiting pumpportal at scale for every open position tick).
         return None
 
     async def _sell(self, mint: str, verdict: str):
@@ -418,6 +417,8 @@ class PumpFunAutoBuyer:
             "last_reason": self.last_reason,
             "live_trader_ready": self.lt.ready,
             "execution_backend": "pumpportal_local_tx + quicknode_rpc",
+            "tp_sl_enforced": False,
+            "exit_policy": "time_limit only (TP/SL values in config are advisory in this version)",
         }
 
 
