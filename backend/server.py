@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from solana.rpc.async_api import AsyncClient
 import os
 import logging
 import asyncio
@@ -287,6 +288,161 @@ async def live_rpc_ping():
     before firing real trades. Reports errors explicitly instead of silently returning 0."""
     lt = get_live_trader()
     return await lt.rpc_ping()
+
+
+@api_router.get("/bot_diagnostic")
+async def bot_diagnostic():
+    """One-shot answer to 'why isn't my bot trading?' — shows the full state.
+
+    Returns a step-by-step readiness map so a user can see exactly WHY no live
+    trades are executing. Zero RPC credits used (all local + Mongo).
+    """
+    from datetime import timedelta
+    lt = get_live_trader()
+    config_data = await db.config.find_one({}, {"_id": 0}) or {}
+
+    now = datetime.now(timezone.utc)
+    one_hour_ago = (now - timedelta(hours=1)).isoformat()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+
+    # Count opportunities + trades in various time windows / types
+    try:
+        opps_last_hour = await db.opportunities.count_documents({
+            "timestamp": {"$gte": one_hour_ago}
+        })
+    except Exception:
+        opps_last_hour = 0
+
+    try:
+        approved_opps_last_hour = await db.opportunities.count_documents({
+            "timestamp": {"$gte": one_hour_ago},
+            "risk_approved": True
+        })
+    except Exception:
+        approved_opps_last_hour = 0
+
+    try:
+        sim_trades_24h = await db.trades.count_documents({
+            "timestamp": {"$gte": one_day_ago},
+            "simulation": True
+        })
+    except Exception:
+        sim_trades_24h = 0
+
+    try:
+        live_trades_24h = await db.trades.count_documents({
+            "type": "live_manual_swap",
+            "created_at": {"$gte": one_day_ago}
+        })
+    except Exception:
+        live_trades_24h = 0
+
+    try:
+        successful_live_trades_24h = await db.trades.count_documents({
+            "type": "live_manual_swap",
+            "created_at": {"$gte": one_day_ago},
+            "success": True
+        })
+    except Exception:
+        successful_live_trades_24h = 0
+
+    # Env vs Mongo config comparison — this is the #1 source of confusion
+    env_sim_mode = str(os.environ.get('SIMULATION_MODE', 'true')).lower() == 'true'
+    mongo_sim_mode = bool(config_data.get('simulation_mode', True))
+    env_live_enabled = str(os.environ.get('LIVE_TRADING_ENABLED', 'false')).lower() == 'true'
+    mongo_auto_execute = bool(config_data.get('auto_execute', False))
+
+    # Build the diagnosis
+    reasons_no_live_trades = []
+    if not env_live_enabled:
+        reasons_no_live_trades.append(
+            "LIVE_TRADING_ENABLED env var is not 'true' on Railway"
+        )
+    if env_sim_mode:
+        reasons_no_live_trades.append(
+            "SIMULATION_MODE env var is still 'true' on Railway"
+        )
+    if not lt.wallet_configured:
+        reasons_no_live_trades.append(
+            "SOLANA_PRIVATE_KEY or SOLANA_RPC_URL not set (wallet_configured=false)"
+        )
+    if not lt.ready:
+        reasons_no_live_trades.append(
+            "live_trader.ready=false — see /api/live/status for detail"
+        )
+    if live_trades_24h == 0:
+        reasons_no_live_trades.append(
+            "IMPORTANT: the bot does NOT auto-fire real trades yet — auto-execution "
+            "is NOT wired into the arbitrage monitor. You must POST /api/live/test_swap "
+            "manually to trigger a real trade. This is a deliberate safety choice."
+        )
+
+    return {
+        "generated_at": now.isoformat(),
+        "verdict_short": (
+            "Live auto-trading is NOT active — see 'reasons_no_live_trades' below "
+            "and 'what_to_do_next'."
+            if reasons_no_live_trades
+            else "Live trading is enabled and configured, but you still need to "
+                 "fire trades manually via /api/live/test_swap."
+        ),
+        "env_vars": {
+            "SIMULATION_MODE": os.environ.get('SIMULATION_MODE'),
+            "LIVE_TRADING_ENABLED": os.environ.get('LIVE_TRADING_ENABLED'),
+            "SOLANA_RPC_URL_set": bool(os.environ.get('SOLANA_RPC_URL')),
+            "SOLANA_PRIVATE_KEY_set": bool(os.environ.get('SOLANA_PRIVATE_KEY')),
+        },
+        "mongo_config": {
+            "simulation_mode": mongo_sim_mode,
+            "auto_execute": mongo_auto_execute,
+            "note": (
+                "The sim-bot's monitor_arbitrage reads simulation_mode from THIS Mongo doc, "
+                "NOT from the env var. If env=false but Mongo=true, sim bot still records "
+                "trades as simulated."
+            ),
+        },
+        "config_mismatch_warning": (
+            "⚠️ ENV and Mongo disagree on simulation_mode. "
+            "The sim-bot uses Mongo. Set them consistently."
+            if env_sim_mode != mongo_sim_mode
+            else None
+        ),
+        "activity_last_hour": {
+            "opportunities_found": opps_last_hour,
+            "opportunities_risk_approved": approved_opps_last_hour,
+        },
+        "trades_last_24h": {
+            "simulation_trades": sim_trades_24h,
+            "live_manual_swap_trades": live_trades_24h,
+            "live_manual_swap_successful": successful_live_trades_24h,
+        },
+        "live_trader_state": {
+            "ready": lt.ready,
+            "wallet_configured": lt.wallet_configured,
+            "wallet_pubkey": lt.wallet_pubkey,
+            "risk_snapshot": lt.risk.snapshot(),
+        },
+        "reasons_no_live_trades": reasons_no_live_trades,
+        "what_to_do_next": (
+            [
+                "1. Verify RPC works: GET /api/live/rpc_ping (uses ~2 credits)",
+                "2. Verify wallet balance: GET /api/live/balance (uses ~1 credit)",
+                "3. Manually fire a tiny test swap: POST /api/live/test_swap with "
+                '{"input_symbol":"SOL","output_symbol":"USDC","amount_usd":0.30,"dry_run":false}',
+                "4. Watch the trade land on Solscan — link appears in /api/live/trades and in the dashboard",
+                "5. Auto-execution IS NOT WIRED YET. The bot will not autonomously fire real trades. "
+                "This is a deliberate safety design — auto-exec against fake simulated signals would burn "
+                "your wallet. Real Jupiter-based auto-arb is a separate feature you'd need to ask for.",
+            ]
+            if lt.ready
+            else [
+                "1. Fix the 'reasons_no_live_trades' items above (set env vars on Railway).",
+                "2. Push latest code to GitHub if you haven't recently.",
+                "3. After redeploy, check /api/live/status — 'ready' should become true.",
+                "4. Only then follow the trade-firing steps.",
+            ]
+        ),
+    }
 
 
 class LiveTestSwapRequest(BaseModel):

@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 4 — backend-only testing of the NEW GET /api/bot_diagnostic endpoint plus regression on all previously tested live endpoints. Created /app/backend/tests/test_bot_diagnostic.py (24 tests: 23 pass, 1 xfail for a known minor response-shape gap). All 18 tests from iterations 2/3 (test_live_trading.py, test_live_rpc_ping.py) still pass. bot_diagnostic returns 200 with the full documented schema, correct default-state verdict ('Live auto-trading is NOT active'), all 4 required reasons, live_manual_swap_trades=0, simulation_trades=83 (>0, sim loop alive), and responds in ~0.27s across 3 calls confirming zero Solana RPC calls. Found 1 real logic defect: the CRITICAL 'auto-execution is NOT wired' reason is gated behind `live_trades_24h == 0`, so it silently disappears as soon as any manual live swap is recorded — verified by seeding a live_manual_swap doc in Mongo (reasons dropped from 5 to 4, auto-exec message gone), then cleaned up.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/bot_diagnostic", "issue": "The critical 'IMPORTANT: the bot does NOT auto-fire real trades yet — auto-execution is NOT wired' item is appended only when live_trades_24h == 0 (server.py ~line 373). Verified by inserting one live_manual_swap trade doc into Mongo: reasons_no_live_trades shrank to 4 items and the auto-exec warning vanished, while verdict_short still said 'NOT active'. Spec requires this message ALWAYS present because even a fully live-ready system never auto-fires. Move it outside the `if live_trades_24h == 0` guard (unconditional append).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "/api/live/balance", "issue": "The wallet-not-configured early-return branch (server.py ~line 266) omits the new rpc_ok field, so response shape is inconsistent between branches. Clients checking `rpc_ok` get undefined. Add rpc_ok: false (or null) + meets_reserve: false to that branch. Test marked xfail."},
+      {"endpoint": "/api/bot_diagnostic", "issue": "Mongo config in the sandbox has auto_execute=true while live trading is off and auto-exec is not wired at all. The diagnostic reports the value but never states that auto_execute=true currently has NO effect — this is exactly the user's confusion. Recommend an explicit line when mongo_auto_execute is true: 'auto_execute=true in Mongo does not fire real trades; it only affects simulated fills.'"},
+      {"endpoint": "/api/bot_diagnostic", "issue": "config_mismatch_warning only compares simulation_mode; it ignores LIVE_TRADING_ENABLED vs mongo auto_execute divergence."},
+      {"endpoint": "/api/bot_diagnostic", "issue": "Five identical `try/except Exception: value = 0` blocks around count_documents silently coerce Mongo failures to 0, which would render a misleadingly 'clean' diagnostic if Mongo is down. Surface a mongo_error field instead of swallowing."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_bot_diagnostic.py",
+    "/app/backend/tests/manual_check_iteration4.py",
+    "/app/test_reports/pytest/bot_diagnostic.xml"
+  ],
+  "action_items": [
+    "HIGH: In /api/bot_diagnostic, make the 'auto-execution is NOT wired' reason unconditional (currently only added when live_trades_24h == 0).",
+    "Add rpc_ok (false) to the wallet-not-configured branch of /api/live/balance for a consistent response shape.",
+    "Add an explicit warning when mongo_config.auto_execute is true that it does not trigger real trades.",
+    "Optional: replace the 5 duplicated count_documents try/except blocks with one helper and report Mongo errors instead of returning 0."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1161 lines — split into routers (live/, arb/, diagnostics/).",
+    "bot_diagnostic does `from datetime import timedelta` inside the handler; move to module-level imports.",
+    "Trade time filters compare ISO strings ($gte on 'created_at'/'timestamp' strings) — verified correct here because inserts store .isoformat(), but this is fragile: any future insert with a real datetime object will silently be excluded from counts. Consider storing UTC datetimes and querying with datetimes.",
+    "Emoji in API payload (config_mismatch_warning) is fine for humans but may break strict-ASCII consumers/log pipelines."
+  ],
+  "updated_files": ["/app/backend/tests/test_bot_diagnostic.py", "/app/backend/tests/manual_check_iteration4.py"],
+  "success_rate": {"backend": "96% (23/24 pass, 1 xfail known minor); 18/18 prior regressions pass", "frontend": "not tested (backend-only per request)"},
+  "seed_data_creation": "One temporary db.trades doc {type: live_manual_swap, _test_marker: TEST_iteration4} inserted and deleted within manual_check_iteration4.py; verified 0 remaining. No other data mutated.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "N/A — endpoints are unauthenticated",
+  "context_for_next_testing_agent": "Run pytest with `-p no:anchorpy` — the anchorpy pytest plugin crashes collection (missing pytest_xprocess entry point). Sandbox env: SIMULATION_MODE=true, LIVE_TRADING_ENABLED unset, SOLANA_RPC_URL set to public mainnet, SOLANA_PRIVATE_KEY unset -> live_trader.ready=false, wallet_configured=false. Mongo config doc has simulation_mode=true, auto_execute=true. bot_diagnostic latency ~0.27s (no RPC). Backend logs show repeated 'Could not get price for X, using fallback' warnings from real_price_connector (sandbox DNS blocks Jupiter) — pre-existing, prices are fallback values. To re-verify the auto-exec-reason fix, run tests/manual_check_iteration4.py: AUTO_EXEC_REASON_PRESENT_WITH_LIVE_TRADE must print True after the fix (currently False).",
+  "rca_of_the_issue": "The user's real root cause (auto-execution not wired into monitor_arbitrage) is correctly surfaced by the new endpoint in the default state, but the message is conditionally suppressed once a manual live swap exists in the last 24h — precisely the moment the user starts experimenting, i.e. exactly when they most need the explanation. Fix: unconditional append."
+}
