@@ -136,7 +136,11 @@ class JupiterClient:
 
     async def _try_urls(self, path: str, params=None, json_body=None,
                         method: str = "GET") -> Dict[str, Any]:
-        """Try primary URL first, then fallbacks on DNS/connection errors."""
+        """Try primary URL first, then fallbacks on connection errors,
+        timeouts, rate limits (HTTP 429), and server errors (HTTP 5xx).
+        Only HTTP 4xx (except 429) raises immediately — those are client errors
+        that another URL can't fix."""
+        import asyncio as _asyncio
         urls_to_try = [self.base_url] + [u for u in self._FALLBACK_URLS if u != self.base_url]
         last_err = None
         for base in urls_to_try:
@@ -145,18 +149,29 @@ class JupiterClient:
                 async with aiohttp.ClientSession() as s:
                     if method == "GET":
                         async with s.get(url, params=params, timeout=10) as r:
+                            if r.status == 429 or r.status >= 500:
+                                body = await r.text()
+                                last_err = RuntimeError(f"HTTP {r.status} from {url}: {body[:200]}")
+                                logger.warning(f"[jupiter] {url} returned {r.status}; trying next")
+                                continue
                             r.raise_for_status()
                             return await r.json()
                     else:
                         async with s.post(url, json=json_body, timeout=15) as r:
+                            if r.status == 429 or r.status >= 500:
+                                body = await r.text()
+                                last_err = RuntimeError(f"HTTP {r.status} from {url}: {body[:200]}")
+                                logger.warning(f"[jupiter] {url} returned {r.status}; trying next")
+                                continue
                             r.raise_for_status()
                             return await r.json()
-            except (aiohttp.ClientConnectorError, aiohttp.ClientConnectorDNSError) as e:
+            except (aiohttp.ClientConnectorError, aiohttp.ClientConnectorDNSError,
+                    aiohttp.ClientConnectionError, _asyncio.TimeoutError) as e:
                 last_err = e
-                logger.warning(f"[jupiter] {url} unreachable ({e}); trying next")
+                logger.warning(f"[jupiter] {url} unreachable ({type(e).__name__}: {e}); trying next")
                 continue
             except aiohttp.ClientResponseError as e:
-                # HTTP error (4xx/5xx) — don't try fallbacks, the URL was reached
+                # HTTP 4xx (other than 429) — don't try fallbacks, client-side error
                 raise
         raise last_err or RuntimeError("all Jupiter URLs failed")
 

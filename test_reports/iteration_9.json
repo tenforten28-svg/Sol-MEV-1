@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 9 backend-only verification of the two HIGH fixes from iteration 8. Updated /app/backend/tests/test_jupiter_fallback.py (16 -> 27 tests) with an extended fully-mocked aiohttp.ClientSession harness (fake responses now expose .status and .text() so the new pre-raise_for_status status check is exercised) plus new solana_dex_swaps assertions. VERIFIED PASS: (1) _try_urls falls back to the next URL on HTTP 429 (the actual production bug: primary returns status=429 with body 'rate limited' -> second URL tried and its JSON returned, exactly 2 attempts in order lite-api -> api.jup.ag) for BOTH the GET /quote and POST /swap paths; (2) falls back on HTTP 500 and 503; (3) falls back on asyncio.TimeoutError; (4) falls back on generic aiohttp.ClientConnectionError; (5) falls back on ClientConnectorError and ClientConnectorDNSError (regression); (6) HTTP 400/404/422 raise ClientResponseError IMMEDIATELY with exactly 1 attempt (no fallback) - confirmed non-429 4xx behaviour preserved; (7) all URLs returning 429 raises an informative error containing '429' after exactly 2 attempts; (8) custom primary tried first then both fallbacks, no duplicate attempt when primary == a fallback entry. solana_dex_swaps.JupiterSwap.__init__ now reads os.environ JUPITER_BASE_URL with default https://lite-api.jup.ag/swap/v1 - verified by source inspection AND by real instantiation with AsyncClient in a cleared env ('lite-api.jup.ag' in jup.api_url) and with the env override set. grep -rn 'quote-api.jup.ag' over all /app/backend/**/*.py returns ZERO functional hits (only a descriptive comment in .env.example line 55 explaining the migration, and the literal inside the test file itself). Full regression: 216/216 pytest PASS (previous 205 with the 16 old jupiter tests replaced by 27), zero regressions. Backend service RUNNING and GET /api/live/status returns 200 via the public URL. Frontend testing skipped as requested.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "live_trader.JupiterClient._try_urls",
+        "issue": "On 429/5xx the loop moves to the next URL with no backoff/sleep. If every URL is rate limited the whole chain burns instantly and the caller retries immediately; a short asyncio.sleep (e.g. 0.5-1s, or honouring Retry-After) between attempts would be safer against Jupiter's limiter."
+      },
+      {
+        "endpoint": "live_trader.JupiterClient._try_urls",
+        "issue": "When all URLs return 429/5xx the raised exception is a generic RuntimeError, so callers cannot distinguish rate-limiting from a hard failure (no .status attribute). Consider raising a typed error or re-raising ClientResponseError so upstream failure-taxonomy code can classify it as retryable."
+      },
+      {
+        "endpoint": "real_price_connector.py:19-20 / meme_price_connector.py:19",
+        "issue": "JUPITER_PRICE_API / JUPITER_QUOTE_API are hardcoded (lite-api.jup.ag/price/v3) with no env override and no fallback; on 429 the code only checks 'status == 200' and silently returns None. Same root cause as the fixed bug will degrade the price feed. Not in the requested scope but worth applying the same env+fallback pattern."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_jupiter_fallback.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: add a small backoff (or Retry-After handling) between fallback attempts in _try_urls.",
+    "Optional: raise a typed/retryable exception instead of RuntimeError when all URLs return 429/5xx.",
+    "Optional: apply the env-var + fallback-URL pattern to real_price_connector.py and meme_price_connector.py Jupiter price/quote endpoints."
+  ],
+  "critical_code_review_comments": [
+    "_try_urls checks r.status before raise_for_status(), which is the correct ordering - 429/5xx short-circuit to the next URL and only non-429 4xx reach raise_for_status(). Verified by mocks.",
+    "The 'except aiohttp.ClientResponseError: raise' branch is placed after the connection-error tuple; since ClientResponseError does not inherit ClientConnectionError, ordering is safe.",
+    "Both fixes are behaviourally correct; only hardening (backoff, typed errors, price-connector parity) remains."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_jupiter_fallback.py"
+  ],
+  "success_rate": {"backend": "100% (216/216)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "None - all network I/O mocked, no DB writes.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "Not required; /app/memory/test_credentials.md not needed for these unit tests.",
+  "context_for_next_testing_agent": "test_jupiter_fallback.py now has 27 tests. Its FakeSessionFactory behaviour tuples are: ('conn', exc) raise on __aenter__, ('http', ClientResponseError) response whose raise_for_status raises, ('status', int, body) response with a given status (used for 429/5xx), ('ok', payload) HTTP 200. Any future change to _try_urls should reuse this harness. Run pytest with -p no:anchorpy. Full suite = 216 tests, ~10s.",
+  "rca_of_the_issue": "Iteration 8 RCA confirmed fixed: (a) _try_urls previously only caught connection/DNS errors, so the free-tier lite-api.jup.ag HTTP 429 propagated as ClientResponseError and blocked every trade; the new code inspects r.status and treats 429 plus 500-599 as retryable before calling raise_for_status, and additionally catches ClientConnectionError and asyncio.TimeoutError. (b) solana_dex_swaps.JupiterSwap hardcoded the NXDOMAIN quote-api.jup.ag/v6 host; it now reads JUPITER_BASE_URL with the lite-api default, so the flash-loan executor path resolves. No occurrences of the deprecated host remain in backend Python source."
+}

@@ -5,6 +5,7 @@ Supports Raydium, Orca, and Jupiter aggregator
 
 import asyncio
 import logging
+import os
 from typing import Dict, Optional, List, Tuple
 from dataclasses import dataclass
 from solders.pubkey import Pubkey
@@ -325,7 +326,7 @@ class JupiterSwap:
     def __init__(self, rpc_client: AsyncClient):
         self.client = rpc_client
         self.program_id = JUPITER_AGGREGATOR_V6
-        self.api_url = "https://quote-api.jup.ag/v6"
+        self.api_url = os.environ.get("JUPITER_BASE_URL", "https://lite-api.jup.ag/swap/v1")
     
     async def get_quote(
         self,
