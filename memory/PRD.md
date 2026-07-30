@@ -18,9 +18,17 @@ User uploaded a Solana MEV/arbitrage bot zip, chose to deploy on Railway (~$5/mo
 - ✅ Full live-trading module with Jito bundles and 6-layer safety guards (double kill switch, max trade $2, min reserve, daily loss cap, losing streak, cooldown, whitelist).
 - ✅ Autonomous arbitrage monitor + decision log.
 - ✅ Pump.fun new-listing detector via QuickNode WSS.
-- ✅ **[2026-02] Pump.fun direct bonding-curve auto-buy** — PumpPortal Local API + local signing. Safety pre-check: mint & freeze authorities must be revoked. Time-limit auto-exit. Master gate `PUMPFUN_AUTO_BUY_ENABLED=false` by default.
-- ✅ **[2026-02] Pump.fun frontend panel** — detector + auto-buy status, 6 stat tiles, recent detections list with Solscan/pump.fun links, position events with buy/sell tx links.
-- ✅ 297/297 backend tests + 14/14 frontend UI assertions passing (test_reports/iteration_12.json).
+- ✅ **[2026-02] Pump.fun anti-rug filter suite** (6 layers, all fail-closed):
+  1. Mint authority revoked (required)
+  2. Freeze authority revoked (required)
+  3. Dev holds ≤ `PUMPFUN_MAX_DEV_HOLD_PCT` (default 15%) — verified via `getTransaction` post-token-balances with 3-retry
+  4. Largest non-pool holder ≤ `PUMPFUN_MAX_HOLDER_PCT` (default 20%) — via `getTokenLargestAccounts` excluding derived bonding-curve ATA
+  5. Top-10 non-pool holders ≤ `PUMPFUN_MAX_TOP10_PCT` (default 30%)
+  6. Bonding curve state: `real_sol_reserves ≥ PUMPFUN_MIN_CURVE_SOL` (default 0.01) AND not graduated — direct PDA account read + Anchor struct decode
+  7. Token-2022 honeypot extensions rejected: transferFeeConfig, permanentDelegate, nonTransferable, transferHook, mintCloseAuthority, defaultAccountState=Frozen
+- ✅ **[2026-02] Pump.fun direct bonding-curve auto-buy** — PumpPortal Local API + local signing. Master gate `PUMPFUN_AUTO_BUY_ENABLED=false` by default. Time-limit auto-exit.
+- ✅ **[2026-02] Pump.fun frontend panel** — detector + auto-buy status, 6 stat tiles, 9-item config strip, detection list with links, position event rows showing dev%/top1%/top10%/curve SOL inline color-coded.
+- ✅ **79/79 anti-rug + fail-closed regression tests passing** (iteration_15).
 
 ## Known limitations (honest)
 - ⚠️ TP/SL config values (`PUMPFUN_TAKE_PROFIT`, `PUMPFUN_STOP_LOSS`) are **advisory** — only `hold_max_seconds` is enforced. Price-based exits require bonding-curve on-chain decoding which is deliberately deferred. Status endpoint reports `tp_sl_enforced: false`.

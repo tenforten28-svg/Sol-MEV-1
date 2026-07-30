@@ -308,7 +308,15 @@ class PumpFunAutoBuyer:
             s = await self._http()
             async with s.post(self.lt.cfg.rpc_url, json=payload, timeout=10) as r:
                 data = await r.json()
-            accounts = ((data.get("result") or {}).get("value") or [])
+            # Fail-closed if the RPC returned an error object
+            if data.get("error"):
+                return {"ok": False, "reason": f"rpc error: {data.get('error')}"}
+            result = data.get("result")
+            if result is None:
+                return {"ok": False, "reason": "no result from getTokenLargestAccounts"}
+            accounts = result.get("value") or []
+            if not accounts:
+                return {"ok": False, "reason": "empty holder list (mint may not be indexed yet)"}
             pool_ata = str(self._bonding_curve_ata(mint, is_token_2022))
             non_pool = [a for a in accounts if a.get("address") != pool_ata]
             # If we somehow didn't identify the pool ATA in the list (edge case),
@@ -330,6 +338,10 @@ class PumpFunAutoBuyer:
                 return int(raw_amt)
 
             balances = [_amt(a) for a in non_pool[:10]]
+            if not balances:
+                # No non-pool holders at all — mint just created with only bonding curve.
+                # Fail-closed: we can't verify concentration.
+                return {"ok": False, "reason": "no non-pool holders (only bonding curve present)"}
             top1 = balances[0] if balances else 0
             top10_sum = sum(balances)
             top1_pct = (top1 / supply_raw) * 100.0
