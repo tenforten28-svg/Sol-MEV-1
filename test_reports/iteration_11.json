@@ -1,0 +1,62 @@
+{
+  "summary": "Iteration 11 backend-only testing of the pump.fun new-listing detector. Created /app/backend/tests/test_pumpfun_sniper.py (30 tests) covering: PUMPFUN_PROGRAM == '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'; get_pumpfun_sniper(db) singleton returns identical instance on subsequent no-arg calls and raises RuntimeError if first call omits db; source scan confirms NO buy/swap/jupiter/send_transaction/keypair/private-key code path exists (detection-only verified); subscribe payload literal matches Solana logsSubscribe spec (params[0]={'mentions':[PUMPFUN_PROGRAM]}, params[1]={'commitment':'processed'}) and was additionally asserted at runtime through a fully mocked aiohttp ClientSession/WebSocket that also proves non-JSON frames and non-logsNotification frames are ignored while a Create notification is dispatched. start() safety: no-op (no task, running False, no exception even outside an event loop) when PUMPFUN_SNIPER_ENABLED is unset, when QUICKNODE_WSS_URL is http:// (non-wss), and when both QUICKNODE_WSS_URL and SOLANA_RPC_URL are empty; stop() is safe with no task. _handle_log_notification with a mocked DB: Create log increments total_events + detections, sets last_detection_at, and inserts one doc with candidate_mint='SomePumpMintAddress1234567890abcdefghijk', signature, slot=42, solscan_url, pumpfun_url and raw_log_count=3; a Buy/swap log increments total_events only (detections stays 0, no insert); malformed payload does not raise; 3 Create + 1 Buy -> total_events=4, detections=3, 3 inserts. Cap logic with count_documents=1005 issues exactly one delete_many({'_id': {'$in': [...5 oldest ids]}}) and never delete_one; no delete when count=10. API via public URL: GET /api/live/pumpfun/status 200 with all 9 required keys, enabled=false, running=false, last_detection_at=null, last_error=null, int counters, note contains 'DETECTION-ONLY' and 'does NOT auto-buy'; GET /api/live/pumpfun/detections?limit=50 200 -> {count:0, detections:[]}, no _id leakage, limit=1 honoured. Full regression: 277/277 pytest PASS (247 baseline from iteration 10 + 30 new), zero regressions across /api/health, /api/live/status, /api/live/auto_arb/status, /api/live/auto_arb/decisions, /api/live/trades, /api/live/summary, /api/live/rpc_ping, /api/live/balance, /api/live/test_swap (POST, refuses in default env), /api/bot_diagnostic, /api/stats. Frontend testing skipped as requested.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "pumpfun_sniper._loop",
+        "issue": "If _connect_and_listen() returns normally (server closes the WS cleanly / subscription rejected without raising), the while-loop immediately reconnects with NO sleep. Against a flaky or auth-rejecting QuickNode endpoint this becomes a tight reconnect loop that will hammer the RPC and burn credits. The 10s backoff only applies on exception. Add an unconditional sleep (or backoff) after each _connect_and_listen return."
+      },
+      {
+        "endpoint": "pumpfun_sniper._handle_log_notification (mint extraction)",
+        "issue": "candidate_mint is extracted only from log lines containing 'mint:' with a >=40-char tail. Real pump.fun create transactions emit the mint inside a base64 'Program data:' anchor event, not a human-readable 'Program log: mint: <addr>' line, so in production candidate_mint will very often be None and pumpfun_url will be null — the detection row then has no actionable token. Consider decoding the anchor CPI event data or fetching the tx's postTokenBalances to resolve the mint."
+      },
+      {
+        "endpoint": "pumpfun_sniper._handle_log_notification (cap logic)",
+        "issue": "count_documents({}) runs on EVERY detection. During a pump.fun burst (dozens of new mints per minute) that is an extra full-collection count per event. Throttle it (e.g. only every Nth detection) or use a capped collection / TTL index instead."
+      },
+      {
+        "endpoint": "db.pumpfun_detections",
+        "issue": "No unique index on `signature` and no dedupe, so a re-delivered logsNotification (which Solana WS can do across reconnects) will insert duplicate detection rows and double-count self.detections."
+      },
+      {
+        "endpoint": "GET /api/live/pumpfun/detections",
+        "issue": "`limit` is unbounded and unvalidated: limit=-1 / limit=0 / limit=1000000 are passed straight to Mongo. Add Query(50, ge=1, le=500)."
+      },
+      {
+        "endpoint": "GET /api/live/pumpfun/status & /detections",
+        "issue": "Both swallow exceptions and return HTTP 200 with an {'error': ...} body instead of a 5xx. Monitoring cannot distinguish healthy from broken. (Consistent with the rest of this codebase, so low priority.)"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pumpfun_sniper.py",
+    "/app/test_reports/pytest/pytest_results_iter11.xml"
+  ],
+  "action_items": [
+    "Add an unconditional backoff sleep in PumpFunSniper._loop so a clean WS close cannot cause a tight reconnect loop.",
+    "Improve mint extraction: current 'mint:' heuristic will yield candidate_mint=None for most real pump.fun create txs.",
+    "Throttle count_documents in the 1000-row cap path (or switch to TTL/capped collection).",
+    "Bound the `limit` query param on /api/live/pumpfun/detections with Query(50, ge=1, le=500) and add a unique index / dedupe on signature."
+  ],
+  "critical_code_review_comments": [
+    "pumpfun_sniper._loop: only the exception branch backs off 10s; a normal return from _connect_and_listen reconnects instantly — unbounded reconnect storm risk against QuickNode.",
+    "self.running is set to True in start() and never cleared when _loop exits, so status().running relies solely on task.done(); if the task is cancelled externally the flag stays stale. Reset self.running=False at the end of _loop.",
+    "logger.warning(f\"[pumpfun] no valid WSS URL — set QUICKNODE_WSS_URL\") is an f-string with no placeholders (harmless lint issue).",
+    "Detection-only claim verified: no swap/jupiter/keypair/private_key/send_transaction symbols exist anywhere in pumpfun_sniper.py."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pumpfun_sniper.py"
+  ],
+  "success_rate": {"backend": "100% (277/277)", "frontend": "not tested (skipped per request)"},
+  "seed_data_creation": "None persisted. All DB interaction for sniper unit tests used in-test FakeCollection/FakeDB doubles; db.pumpfun_detections was left empty (endpoint returns count=0).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Baseline is now 277 pytest tests, all passing, run with `cd /app/backend && python -m pytest tests/ -p no:anchorpy -q` (the -p no:anchorpy flag is required). New file this iteration: tests/test_pumpfun_sniper.py. Sandbox blocks outbound WSS, so the pump.fun sniper never actually connects here — all WS behaviour is covered via a mocked aiohttp.ClientSession (see TestMockedWebSocket) and direct _handle_log_notification calls with a FakeDB. PUMPFUN_SNIPER_ENABLED is unset in the deployed env, so /api/live/pumpfun/status must report enabled=false/running=false and detections count=0; if a future iteration enables it these assertions need updating. /api/live/test_swap requires a JSON body {input_symbol, output_symbol, amount_usd, dry_run} — a bare POST returns 422.",
+  "rca_of_the_issue": "No functional defects found. The two initial test failures were both test-script issues that I fixed in scope: (1) the 'no BUY code' source scan banned the substring 'sign', which false-matched 'signature' in the detection doc — narrowed to 'sign_transaction'/'private_key'; (2) the /api/live/test_swap regression check POSTed with no body and got 422 — corrected to send the LiveTestSwapRequest payload."
+}

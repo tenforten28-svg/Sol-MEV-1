@@ -109,6 +109,16 @@ async def lifespan(app: FastAPI):
         logger.info("💠 Live Arbitrage Monitor initialized (starts only if AUTO_ARB_ENABLED=true)")
     except Exception as e:
         logger.exception(f"Failed to start live arb monitor: {e}")
+
+    # Start PUMP.FUN new-mint detector (detection only, no auto-buy)
+    # Gated by PUMPFUN_SNIPER_ENABLED env var.
+    try:
+        from pumpfun_sniper import get_pumpfun_sniper
+        pf_sniper = get_pumpfun_sniper(db)
+        pf_sniper.start()
+        logger.info("🎯 Pump.fun sniper initialized (detection only; enable with PUMPFUN_SNIPER_ENABLED=true)")
+    except Exception as e:
+        logger.exception(f"Failed to start pump.fun sniper: {e}")
     
     logger.info("🚀 Solana MEV Arbitrage Bot started")
     logger.info("⚡ Flash Loan Monitor enabled")
@@ -328,6 +338,35 @@ async def auto_arb_decisions(limit: int = 20):
         return {"count": len(docs), "decisions": docs}
     except Exception as e:
         return {"count": 0, "decisions": [], "error": str(e)}
+
+
+# ============================================================
+# PUMP.FUN SNIPER ENDPOINTS (detection only)
+# ============================================================
+from pumpfun_sniper import get_pumpfun_sniper
+
+
+@api_router.get("/live/pumpfun/status")
+async def pumpfun_status():
+    """Pump.fun new-mint detector status + counters."""
+    try:
+        return get_pumpfun_sniper(db).status()
+    except Exception as e:
+        return {"error": str(e), "enabled": False, "running": False}
+
+
+@api_router.get("/live/pumpfun/detections")
+async def pumpfun_detections(limit: int = 50):
+    """Recent pump.fun new mint detections. Newest first."""
+    try:
+        cursor = db.pumpfun_detections.find({}).sort("detected_at", -1).limit(limit)
+        docs = []
+        async for d in cursor:
+            d.pop("_id", None)
+            docs.append(d)
+        return {"count": len(docs), "detections": docs}
+    except Exception as e:
+        return {"count": 0, "detections": [], "error": str(e)}
 
 
 @api_router.get("/bot_diagnostic")
