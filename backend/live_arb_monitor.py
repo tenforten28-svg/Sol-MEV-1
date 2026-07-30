@@ -23,7 +23,7 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from live_trader import (
     LiveTrader, get_live_trader,
-    MINTS, DECIMALS,
+    MINTS, DECIMALS, PRICE_HINTS_USD,
 )
 
 logger = logging.getLogger("live_arb_monitor")
@@ -56,11 +56,25 @@ class ArbMonitorConfig:
         self.min_profit_bps = _env_int("AUTO_ARB_MIN_PROFIT_BPS", 30)
         # Pairs to monitor as (start_token, middle_token). Round-trip = start→mid→start.
         # These MUST be whitelisted in LiveTrader too.
-        self.pairs: List[Tuple[str, str]] = [
-            ("USDC", "SOL"),
-            ("USDC", "JUP"),
-            # ("USDC", "USDT"),   # very tight, rarely profitable
-        ]
+        # Configurable via AUTO_ARB_PAIRS env var (comma-separated, e.g. "USDC:SOL,USDC:JUP,USDC:BONK")
+        pairs_env = os.environ.get("AUTO_ARB_PAIRS", "").strip()
+        if pairs_env:
+            self.pairs = []
+            for spec in pairs_env.split(","):
+                parts = spec.strip().split(":")
+                if len(parts) == 2:
+                    self.pairs.append((parts[0].strip(), parts[1].strip()))
+        else:
+            # Default: majors + memes (pump.fun-graduated tokens with real DEX liquidity)
+            self.pairs: List[Tuple[str, str]] = [
+                ("USDC", "SOL"),
+                ("USDC", "JUP"),
+                # Meme pairs — pump.fun originated, Jupiter routes via pump-AMM + Raydium
+                ("USDC", "BONK"),
+                ("USDC", "WIF"),
+                ("USDC", "POPCAT"),
+                ("USDC", "PNUT"),
+            ]
 
 
 # =========================================================
@@ -129,13 +143,14 @@ class LiveArbMonitor:
         pair_label = f"{start_sym}->{mid_sym}->{start_sym}"
         try:
             # Convert trade_size_usd to base units of the start token.
-            if start_sym in ("USDC", "USDT"):
-                start_base = int(self.cfg.trade_size_usd * (10 ** DECIMALS[start_sym]))
-            elif start_sym == "SOL":
-                start_base = int((self.cfg.trade_size_usd / 150.0) * (10 ** DECIMALS["SOL"]))
-            else:
+            hint = PRICE_HINTS_USD.get(start_sym)
+            if hint is None or hint <= 0:
                 return await self._record_decision("skipped", pair_label,
-                                                    f"unsupported start token {start_sym}", None)
+                                                    f"no price hint for {start_sym}", None)
+            start_base = int((self.cfg.trade_size_usd / hint) * (10 ** DECIMALS[start_sym]))
+            if start_base <= 0:
+                return await self._record_decision("skipped", pair_label,
+                                                    f"start_base=0 (size too small)", None)
 
             # Leg 1 quote: start -> mid
             q1 = await self.lt.jupiter.get_quote(
@@ -220,18 +235,15 @@ class LiveArbMonitor:
             approx_gas_lamports = 10_000  # ~2 base tx fees (5000 each)
             fee_sol = (total_tip_lamports + approx_gas_lamports) / 1_000_000_000
 
-            # Convert to USD PnL (rough — treats stables as $1, SOL as $150)
+            # Convert to USD PnL (uses PRICE_HINTS_USD from live_trader)
             def base_to_usd(sym: str, base_units: int) -> float:
-                d = DECIMALS[sym]
+                d = DECIMALS.get(sym, 6)
                 whole = base_units / (10 ** d)
-                if sym in ("USDC", "USDT"): return whole
-                if sym == "SOL":           return whole * 150.0
-                if sym == "JUP":           return whole * 0.5
-                return 0.0
+                return whole * PRICE_HINTS_USD.get(sym, 0.0)
 
             start_usd = base_to_usd(start_sym, start_base)
             realized_usd = base_to_usd(start_sym, realized_final)
-            fee_usd = fee_sol * 150.0  # SOL price estimate
+            fee_usd = fee_sol * PRICE_HINTS_USD.get("SOL", 150.0)
             pnl_usd = round(realized_usd - start_usd - fee_usd, 6)
 
             self.lt.risk.record_trade(pnl_usd)

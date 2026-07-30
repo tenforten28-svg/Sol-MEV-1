@@ -34,24 +34,46 @@ from solders.message import MessageV0
 logger = logging.getLogger("live_trader")
 
 # =========================================================
-# TOKEN MINTS — the 5 whitelisted pairs
+# TOKEN MINTS — the whitelisted trading universe
+# Includes major stables (USDC, USDT), majors (SOL, JUP), LSTs (JitoSOL, mSOL),
+# and pump.fun-originated meme tokens now trading on Raydium/pump-AMM
 # =========================================================
 MINTS = {
-    "SOL":     "So11111111111111111111111111111111111111112",
-    "USDC":    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-    "USDT":    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-    "JUP":     "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-    "JitoSOL": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
-    "mSOL":    "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+    "SOL":      "So11111111111111111111111111111111111111112",
+    "USDC":     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "USDT":     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "JUP":      "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "JitoSOL":  "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+    "mSOL":     "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+    # Meme tokens (pump.fun-origin, now multi-DEX with real liquidity)
+    "BONK":     "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "WIF":      "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+    "POPCAT":   "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+    "PNUT":     "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump",
 }
 
-# Whitelisted pairs — anything outside this list is refused (safety)
+# Whitelisted round-trip pairs (start/mid). Only these can be traded.
 WHITELISTED_PAIRS = {
+    # Safe majors
     "SOL/USDC", "JitoSOL/SOL", "mSOL/SOL", "USDC/USDT", "JUP/USDC",
+    # Meme volatility (higher risk, higher fire rate)
+    "BONK/USDC", "WIF/USDC", "POPCAT/USDC", "PNUT/USDC",
+    "USDC/BONK", "USDC/WIF", "USDC/POPCAT", "USDC/PNUT",
 }
 
 # Token decimals (needed to convert human amounts to base units)
-DECIMALS = {"SOL": 9, "USDC": 6, "USDT": 6, "JUP": 6, "JitoSOL": 9, "mSOL": 9}
+DECIMALS = {
+    "SOL": 9, "USDC": 6, "USDT": 6, "JUP": 6, "JitoSOL": 9, "mSOL": 9,
+    "BONK": 5, "WIF": 6, "POPCAT": 9, "PNUT": 6,
+}
+
+# Approximate USD price for sizing conversion (rough, updated occasionally).
+# Only used to convert amount_usd -> base units on the START token.
+PRICE_HINTS_USD = {
+    "SOL": 150.0, "JitoSOL": 165.0, "mSOL": 165.0,
+    "USDC": 1.0, "USDT": 1.0, "JUP": 0.5,
+    "BONK": 0.00002, "WIF": 1.5, "POPCAT": 0.4, "PNUT": 0.15,
+}
 
 # =========================================================
 # JITO — MEV protection via bundled tx submission

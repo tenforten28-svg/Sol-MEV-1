@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 10 backend-only verification of pump.fun-graduated meme token support. Created /app/backend/tests/test_meme_tokens.py (31 tests, all passing) covering: MINTS now has exactly 10 entries with the 4 meme mint addresses byte-exact (BONK=DezXAZ8z...pPB263, WIF=EKpQGSJt...M65zcjm, POPCAT=7GCihgDB...HYmW2hr, PNUT=2qEHjDLD...P1tpump) and legacy SOL/USDC/USDT/JUP mints unchanged; every mint parses as a valid solders Pubkey; DECIMALS has BONK=5, WIF=6, POPCAT=9, PNUT=6 and covers every mint; PRICE_HINTS_USD exists with all 10 tokens, all positive, stables == 1.0, and $1 of each meme converts to >0 base units; WHITELISTED_PAIRS has exactly 13 entries including both directions of the 4 meme/USDC pairs plus the original 5 majors, and every symbol in the whitelist resolves in MINTS. API via public URL: GET /api/live/status returns 200 with whitelisted_pairs list of length 13 including all meme pairs; GET /api/live/auto_arb/status returns 200 with config.pairs exactly ['USDC->SOL->USDC','USDC->JUP->USDC','USDC->BONK->USDC','USDC->WIF->USDC','USDC->POPCAT->USDC','USDC->PNUT->USDC']. ArbMonitorConfig AUTO_ARB_PAIRS parsing verified by os.environ manipulation + importlib.reload: unset -> 6 defaults, whitespace-only -> 6 defaults, 'USDC:SOL,USDC:BONK' -> exactly those 2 pairs, whitespace/garbage-mixed spec -> only the 2 valid pairs, all-invalid spec -> empty list. Code inspection confirms _evaluate_pair sizes via PRICE_HINTS_USD.get(start_sym) with no per-symbol if/elif branches and the fee PnL uses PRICE_HINTS_USD.get('SOL', 150.0) (150.0 remains only as a .get fallback default, not as a hardcoded multiplier). Behavioural tests with a dummy DB: _evaluate_pair('FAKECOIN','USDC') records verdict='skipped' reason='no price hint for FAKECOIN'; with a mocked jupiter.get_quote, USDC->BONK->USDC sizes to 1_000_000 USDC base units, calls both legs against the BONK mint, and skips with 'below threshold'. Full regression: 247/247 pytest PASS (216 baseline from iteration 9 + 31 new), zero regressions. Frontend testing skipped as requested.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "live_arb_monitor.ArbMonitorConfig (AUTO_ARB_PAIRS)",
+        "issue": "No validation of parsed symbols. AUTO_ARB_PAIRS='junk,also-junk' silently yields pairs=[] so the monitor scans nothing while still reporting enabled/running; AUTO_ARB_PAIRS='USDC:FAKE' passes config but produces a 'no price hint'/KeyError-prone skip on every scan cycle. Suggest rejecting/logging specs whose symbols are not in MINTS + WHITELISTED_PAIRS and falling back to defaults if the result is empty."
+      },
+      {
+        "endpoint": "live_arb_monitor._evaluate_pair",
+        "issue": "start_base uses DECIMALS[start_sym] directly (KeyError if a token has a PRICE_HINTS_USD entry but no DECIMALS entry). Use DECIMALS.get(start_sym) with the same skip path as the price-hint guard."
+      },
+      {
+        "endpoint": "live_trader.PRICE_HINTS_USD",
+        "issue": "Hardcoded static USD prices for volatile memes (BONK 0.00002, WIF 1.5, POPCAT 0.4, PNUT 0.15). Drift only affects sizing (profit_bps is relative), but a 5-10x drift on a $1-2 trade can materially over/under-size. Consider refreshing hints from a price feed or from Jupiter quote output periodically."
+      },
+      {
+        "endpoint": "live_trader.LiveTraderConfig.slippage_bps",
+        "issue": "Default LIVE_SLIPPAGE_BPS=50 (0.5%) is tight for meme tokens on thin pump-AMM routes; expect elevated leg2 failures/unwinds. Consider a per-token slippage override for memes."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_meme_tokens.py",
+    "/app/test_reports/pytest/iter10_results.xml",
+    "/app/test_reports/pytest/iter10_baseline.xml"
+  ],
+  "action_items": [
+    "Optional: validate AUTO_ARB_PAIRS symbols against MINTS/WHITELISTED_PAIRS and fall back to defaults when parsing yields an empty list",
+    "Optional: guard DECIMALS lookup in _evaluate_pair like the PRICE_HINTS_USD guard",
+    "Optional: consider a meme-specific slippage bps and dynamic price hints"
+  ],
+  "critical_code_review_comments": [
+    "AUTO_ARB_PAIRS parsing accepts any string shape 'A:B' without symbol validation — an unknown symbol silently produces a per-scan skip decision or an empty scan list.",
+    "DECIMALS[start_sym] in _evaluate_pair is unguarded while PRICE_HINTS_USD is guarded — asymmetric error handling."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_meme_tokens.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "not tested"},
+  "seed_data_creation": "None. Behavioural monitor tests used an in-test dummy DB stub; no Mongo writes.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "None required; /app/memory/test_credentials.md not needed for these endpoints",
+  "context_for_next_testing_agent": "Run pytest from /app/backend with '-p no:anchorpy' (the anchorpy pytest plugin fails to import due to missing pytest_xprocess; unrelated to app code). Baseline is now 247 tests in /app/backend/tests/. New file test_meme_tokens.py covers meme token constants, AUTO_ARB_PAIRS env override (uses importlib.reload and restores env in a finally block), and mocked _evaluate_pair paths. Jupiter DNS is blocked in the sandbox, so any quote/swap path must be mocked.",
+  "rca_of_the_issue": "N/A — no defects found in the iteration 10 changes; all 12 requested verification points pass."
+}
