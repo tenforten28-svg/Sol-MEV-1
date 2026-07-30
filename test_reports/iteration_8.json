@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 8 backend-only verification of the Jupiter URL fix in live_trader.py. Created /app/backend/tests/test_jupiter_fallback.py (16 tests, all PASS) with a fully mocked aiohttp.ClientSession (fake session/response/request context managers) plus static source inspection. Verified: (1) JupiterClient._FALLBACK_URLS exists with both 'https://lite-api.jup.ag/swap/v1' and 'https://api.jup.ag/swap/v1' and no deprecated quote-api URL anywhere in live_trader.py; (2) _try_urls(path, params, json_body, method) exists and get_quote/build_swap_tx delegate to it (no ClientSession usage in their bodies, correct /quote GET params and /swap POST body asserted); (3) LiveTraderConfig.jupiter_base default (env unset, patched os.environ) == 'https://lite-api.jup.ag/swap/v1', and JUPITER_BASE_URL override still wins with trailing-slash stripping; (4) MOCKED fallback behaviour: ClientConnectorError and ClientConnectorDNSError on primary -> second URL attempted and its JSON returned (exactly 2 attempts, correct order); ClientResponseError 400/422/500 -> raised immediately with exactly 1 attempt (no fallback); connection error on ALL URLs -> last ClientConnectorError re-raised after 2 attempts; a custom primary is tried first then both fallbacks in order; no duplicate attempt when primary == a fallback entry. Full regression: 205/205 pytest PASS (189 prior + 16 new), zero regressions. REAL-NETWORK PROBE (sandbox DNS is NOT blocked, contrary to the request note): quote-api.jup.ag/v6 = ClientConnectorDNSError x3 (confirms RCA), lite-api.jup.ag/swap/v1 = HTTP 429 x3 (persistent), api.jup.ag/swap/v1 = HTTP 200 x3 without any API key. Because 429 is a ClientResponseError, the new fallback chain does NOT engage and the bot would still fail 100% of scans - just with 429 instead of a DNS error. GET /api/live/status returns 200 but does not expose jupiter_base at all, so the requested regression check could not be validated through the API.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "live_trader.JupiterClient._try_urls", "issue": "Fallback only triggers on ClientConnectorError/ClientConnectorDNSError. Real probe shows the new default primary (lite-api.jup.ag/swap/v1, free tier) returns a persistent HTTP 429 from this host while api.jup.ag/swap/v1 returns 200 - so a rate-limited/5xx primary raises immediately and no fallback is attempted, leaving auto_arb scans failing 100% of the time. Treat 429 and 5xx (and asyncio.TimeoutError / generic ClientConnectionError) as retryable -> try the next URL, ideally with a short backoff.", "priority": "HIGH"},
+      {"endpoint": "backend/solana_dex_swaps.py:328", "issue": "JupiterSwap still hardcodes the DEPRECATED 'https://quote-api.jup.ag/v6' (verified: NXDOMAIN). This class is used by flash_loan_executor_production.py (create_swap_transaction), so that whole path will fail with the exact same DNS error the user reported. Same fix must be applied there (or reuse JupiterClient).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/live/status", "issue": "Response has no jupiter_base / jupiter URL field, so the user cannot verify from the deployed app which Jupiter endpoint is in use. Add cfg.jupiter_base (and the fallback list) to status()."},
+      {"endpoint": "live_trader.JupiterClient._try_urls", "issue": "`except aiohttp.ClientResponseError: raise` is dead code (bare raise, no logging). Either drop it or log the URL+status so 4xx/5xx failures are diagnosable in Railway logs."},
+      {"endpoint": "backend/real_price_connector.py:20", "issue": "JUPITER_QUOTE_API points to the paid host api.jup.ag/swap/v1 with no key and no fallback; it currently works unauthenticated but has no retry/fallback path if that changes."},
+      {"endpoint": "live_trader.JupiterClient", "issue": "A new aiohttp.ClientSession is created per attempt (per quote). At a 15s scan interval with 4 quotes/cycle this is wasteful and contributes to rate limiting; reuse one session."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_jupiter_fallback.py",
+    "/app/test_reports/pytest/iteration8.xml"
+  ],
+  "action_items": [
+    "Retry/fallback on HTTP 429 and 5xx (and timeouts), not only on connection/DNS errors - otherwise the reported 100% scan failure persists as a 429 on the free lite-api tier.",
+    "Fix the second deprecated hardcoded URL: solana_dex_swaps.py:328 'https://quote-api.jup.ag/v6'.",
+    "Expose jupiter_base + fallback URLs in GET /api/live/status so the deployed config is verifiable.",
+    "Consider making api.jup.ag/swap/v1 the primary (returned 200 unauthenticated in probe) or add short backoff between fallback attempts."
+  ],
+  "critical_code_review_comments": [
+    "The retry predicate is too narrow: aiohttp raises ClientResponseError for 429 and asyncio.TimeoutError for hangs; neither falls back today, so the fallback list gives little real resilience.",
+    "last_err can only be a connection error; if the primary 429s and the secondary would have worked, the user sees no attempt on the secondary at all - log every attempt outcome (status or exception) for diagnosability.",
+    "No per-URL health memory: after a primary failure every subsequent scan pays the failed primary attempt again. Cache the last working base URL for the process lifetime."
+  ],
+  "updated_files": ["/app/backend/tests/test_jupiter_fallback.py", "/app/test_reports/iteration_8.json"],
+  "success_rate": {"backend": "100% (205/205 pytest; 16/16 new Jupiter fallback tests)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "None - all new tests are pure unit tests with mocked aiohttp; no Mongo writes.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "/app/memory/test_credentials.md is empty; app has no auth, not required.",
+  "context_for_next_testing_agent": "test_jupiter_fallback.py contains a reusable FakeSessionFactory (patch aiohttp.ClientSession with patch.object) that maps URL substrings to ('conn'|'http'|'ok', value) - use it for any further Jupiter/HTTP retry testing. Run pytest from /app/backend with -p no:anchorpy. IMPORTANT: jup.ag DNS is NOT blocked in this sandbox - lite-api.jup.ag returns 429 and api.jup.ag returns 200 unauthenticated, so you can probe real endpoints. If the retry predicate is widened to include 429/5xx, the two tests asserting 'HTTP error raises immediately without fallback' (400/422/500) must be updated to reflect the new intended behaviour.",
+  "rca_of_the_issue": "Original failure confirmed: quote-api.jup.ag has no DNS record (NXDOMAIN) after Jupiter's 2025 migration, so every scan failed. The applied fix (new default + fallback list) is implemented correctly and fully verified under mocks. However a live probe shows the chosen primary lite-api.jup.ag/swap/v1 responds 429 (rate limited) from this network, and since the fallback triggers only on connection/DNS exceptions, the request raises immediately and api.jup.ag/swap/v1 (which answers 200) is never tried - so the user-visible symptom may recur as a 429. Widen the retry predicate to 429/5xx/timeout."
+}

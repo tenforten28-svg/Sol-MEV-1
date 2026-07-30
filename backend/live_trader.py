@@ -94,7 +94,7 @@ class LiveTraderConfig:
         self.live_enabled = _env_bool("LIVE_TRADING_ENABLED", False)
         self.rpc_url = os.environ.get("SOLANA_RPC_URL", "").strip()
         self.private_key = os.environ.get("SOLANA_PRIVATE_KEY", "").strip()
-        self.jupiter_base = os.environ.get("JUPITER_BASE_URL", "https://quote-api.jup.ag/v6").rstrip("/")
+        self.jupiter_base = os.environ.get("JUPITER_BASE_URL", "https://lite-api.jup.ag/swap/v1").rstrip("/")
 
         # Safety limits
         self.max_trade_usd = _env_float("MAX_TRADE_USD", 2.0)
@@ -125,8 +125,40 @@ class LiveTraderConfig:
 # JUPITER CLIENT (async aiohttp)
 # =========================================================
 class JupiterClient:
+    # Fallback URLs tried in order if primary fails with DNS/connection error.
+    _FALLBACK_URLS = [
+        "https://lite-api.jup.ag/swap/v1",
+        "https://api.jup.ag/swap/v1",
+    ]
+
     def __init__(self, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
+
+    async def _try_urls(self, path: str, params=None, json_body=None,
+                        method: str = "GET") -> Dict[str, Any]:
+        """Try primary URL first, then fallbacks on DNS/connection errors."""
+        urls_to_try = [self.base_url] + [u for u in self._FALLBACK_URLS if u != self.base_url]
+        last_err = None
+        for base in urls_to_try:
+            url = f"{base}{path}"
+            try:
+                async with aiohttp.ClientSession() as s:
+                    if method == "GET":
+                        async with s.get(url, params=params, timeout=10) as r:
+                            r.raise_for_status()
+                            return await r.json()
+                    else:
+                        async with s.post(url, json=json_body, timeout=15) as r:
+                            r.raise_for_status()
+                            return await r.json()
+            except (aiohttp.ClientConnectorError, aiohttp.ClientConnectorDNSError) as e:
+                last_err = e
+                logger.warning(f"[jupiter] {url} unreachable ({e}); trying next")
+                continue
+            except aiohttp.ClientResponseError as e:
+                # HTTP error (4xx/5xx) — don't try fallbacks, the URL was reached
+                raise
+        raise last_err or RuntimeError("all Jupiter URLs failed")
 
     async def get_quote(self, input_mint: str, output_mint: str,
                         amount: int, slippage_bps: int = 50) -> Dict[str, Any]:
@@ -137,10 +169,7 @@ class JupiterClient:
             "slippageBps": str(slippage_bps),
             "restrictIntermediateTokens": "true",
         }
-        async with aiohttp.ClientSession() as s:
-            async with s.get(f"{self.base_url}/quote", params=params, timeout=10) as r:
-                r.raise_for_status()
-                return await r.json()
+        return await self._try_urls("/quote", params=params, method="GET")
 
     async def build_swap_tx(self, quote: Dict[str, Any], user_pubkey: str) -> Dict[str, Any]:
         body = {
@@ -150,10 +179,7 @@ class JupiterClient:
             "dynamicComputeUnitLimit": True,
             "prioritizationFeeLamports": "auto",
         }
-        async with aiohttp.ClientSession() as s:
-            async with s.post(f"{self.base_url}/swap", json=body, timeout=15) as r:
-                r.raise_for_status()
-                return await r.json()
+        return await self._try_urls("/swap", json_body=body, method="POST")
 
 
 # =========================================================
