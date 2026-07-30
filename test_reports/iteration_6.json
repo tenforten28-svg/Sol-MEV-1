@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 6 backend-only testing of the new autonomous live arbitrage monitor. Created /app/backend/tests/test_auto_arb_monitor.py (19 new tests) covering GET /api/live/auto_arb/status, GET /api/live/auto_arb/decisions (incl. seeded newest-first ordering, limit param, _id leak check), the replaced AUTO_ARB_ENABLED reason in /api/bot_diagnostic, /api/live/trades + /api/live/summary aggregation of type 'live_auto_arb' (seeded auto_sig_123 doc -> total_trades=1, total_volume_usd=1.0, successful_trades=1, success_rate_pct=100, then cleaned up and verified removed), mixed live_manual_swap+live_auto_arb aggregation (2 trades / $5 volume / 1 success), get_arb_monitor() singleton semantics (RuntimeError without db on first call, same instance without db afterwards), safety (cfg.enabled False with AUTO_ARB_ENABLED unset, start() is a no-op, running False, task None), env override parsing (AUTO_ARB_ENABLED/MIN_PROFIT_BPS/TRADE_SIZE_USD/SCAN_INTERVAL) and bad-value fallbacks, and that monitored pair tokens are present in LiveTrader MINTS/DECIMALS. Updated two stale iteration-5 assertions that still required the removed 'auto-execution is NOT wired' wording (test-code only change). Full suite: 179/179 PASS (includes all prior iteration_5 live/diagnostic tests + unit suites). All regression endpoints verified: /api/health, /api/live/status, /api/live/rpc_ping, /api/live/balance, /api/live/trades, /api/live/summary, POST /api/live/test_swap (still blocked in default env), /api/bot_diagnostic, /api/stats.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "live_arb_monitor._scan_once", "issue": "The 'live_trader not ready' decision returned by _record_decision is not assigned to self.last_decision, so /api/live/auto_arb/status.last_decision stays null in the most common real-world case (monitor enabled but trader not ready)."},
+      {"endpoint": "live_arb_monitor.status", "issue": "trade doc written by the monitor has no jito_tip_lamports field, so /api/live/summary today.total_jito_tips_sol will always be 0 for auto-arb trades even when legs were sent via Jito bundles (leg results do carry jito_tip_lamports)."},
+      {"endpoint": "live_arb_monitor._record_decision", "issue": "Cap logic runs count_documents({}) on db.arb_decisions on EVERY decision and then deletes documents one-by-one; with a 15s scan interval x 2 pairs this is wasteful. Use a capped collection or a single delete_many with an $lt cutoff."},
+      {"endpoint": "live_arb_monitor.stop/start", "issue": "After stop(), start() cannot restart the loop reliably: running is set False and the cancelled task remains; start() checks 'task and not task.done()' which passes, but there is no state reset/guard for a restart flow. No API endpoint exposes start/stop today so impact is limited to lifespan use."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_auto_arb_monitor.py",
+    "/app/backend/tests/test_bot_diagnostic.py",
+    "/app/backend/tests/test_bot_diagnostic_fixes.py",
+    "/app/test_reports/pytest/iteration6.xml"
+  ],
+  "action_items": [
+    "Set self.last_decision when _scan_once records the 'live_trader not ready' skip so the status endpoint surfaces it.",
+    "Persist jito_tip_lamports (sum of leg1+leg2) on the live_auto_arb trade doc so /api/live/summary tip totals are accurate.",
+    "Optimise the arb_decisions capping (single delete_many or capped collection) instead of count+per-doc deletes each cycle.",
+    "Consider an unwind/retry path when leg1 succeeds and leg2 fails (currently the wallet is left holding the mid token with only a decision log)."
+  ],
+  "critical_code_review_comments": [
+    "Half-executed round trip risk: if leg2 fails the position stays in the mid token and pnl is recorded as -100% of the leg (realized_final=0), which both misstates PnL and leaves real funds exposed. Add a retry/unwind and mark such trades with a distinct type/flag.",
+    "Hardcoded prices in live_arb_monitor (SOL=150.0, JUP=0.5) are used for both sizing and PnL conversion; with real money this can size trades and report PnL incorrectly. Source prices from a quote/oracle.",
+    "risk.record_trade(-0.05) on failed leg1 is a magic constant for gas cost; derive it from actual fee/tip config.",
+    "server.py is 1210 lines — split live-trading/auto-arb endpoints into a dedicated router module.",
+    "profit_bps is computed purely from Jupiter quote outAmounts and does not subtract network fee + Jito tip; the 30 bps default threshold is the only buffer. Make the fee deduction explicit before firing real trades."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auto_arb_monitor.py",
+    "/app/backend/tests/test_bot_diagnostic.py",
+    "/app/backend/tests/test_bot_diagnostic_fixes.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Temporary Mongo docs only: db.arb_decisions test decisions marked _test_marker=TEST_ARB_DECISION, db.trades docs with signatures auto_sig_123 / TEST_manual_sig / TEST_auto_sig. All deleted in test teardown and deletion verified.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "none required (default safe env, AUTO_ARB_ENABLED unset)",
+  "context_for_next_testing_agent": "Run pytest with '-p no:anchorpy' — the anchorpy pytest plugin fails to import (missing pytest_xprocess entrypoint module) and aborts collection otherwise. Suite: 179 tests, all green (tests/test_auto_arb_monitor.py is the iteration-6 additions). The old bot_diagnostic 'auto-execution is NOT wired' assertions were intentionally replaced with AUTO_ARB_ENABLED assertions. The live arb loop itself cannot be exercised here (AUTO_ARB_ENABLED unset + sandbox blocks Jupiter DNS); only static/config/endpoint behaviour was validated. If auto-exec logic needs functional coverage, it requires mocking lt.jupiter.get_quote and lt.execute_swap in unit tests.",
+  "rca_of_the_issue": "No functional defect found. The two pre-existing test failures avoided were purely stale expectations from iteration 5 asserting wording that the developer deliberately replaced; assertions were updated in test code only."
+}

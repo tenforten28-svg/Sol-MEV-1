@@ -99,6 +99,16 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(cleanup_stale_opportunities())
     asyncio.create_task(monitor_meme_opportunities())
     asyncio.create_task(flash_loan_monitor.monitor_loop())  # Start flash loan monitor
+
+    # Start LIVE auto-arbitrage monitor (real Jupiter round-trip; real money)
+    # Gated by AUTO_ARB_ENABLED env var — safe by default (disabled).
+    try:
+        from live_arb_monitor import get_arb_monitor
+        arb_mon = get_arb_monitor(db)
+        arb_mon.start()
+        logger.info("💠 Live Arbitrage Monitor initialized (starts only if AUTO_ARB_ENABLED=true)")
+    except Exception as e:
+        logger.exception(f"Failed to start live arb monitor: {e}")
     
     logger.info("🚀 Solana MEV Arbitrage Bot started")
     logger.info("⚡ Flash Loan Monitor enabled")
@@ -291,6 +301,35 @@ async def live_rpc_ping():
     return await lt.rpc_ping()
 
 
+# ============================================================
+# LIVE AUTO-ARBITRAGE MONITOR ENDPOINTS
+# ============================================================
+from live_arb_monitor import get_arb_monitor
+
+
+@api_router.get("/live/auto_arb/status")
+async def auto_arb_status():
+    """Status + counters for the autonomous arb monitor."""
+    try:
+        return get_arb_monitor(db).status()
+    except Exception as e:
+        return {"error": str(e), "enabled": False, "running": False}
+
+
+@api_router.get("/live/auto_arb/decisions")
+async def auto_arb_decisions(limit: int = 20):
+    """Recent decisions from the auto-arb monitor (why fired / skipped / blocked)."""
+    try:
+        cursor = db.arb_decisions.find({}).sort("at", -1).limit(limit)
+        docs = []
+        async for d in cursor:
+            d.pop("_id", None)
+            docs.append(d)
+        return {"count": len(docs), "decisions": docs}
+    except Exception as e:
+        return {"count": 0, "decisions": [], "error": str(e)}
+
+
 @api_router.get("/bot_diagnostic")
 async def bot_diagnostic():
     """One-shot answer to 'why isn't my bot trading?' — shows the full state.
@@ -371,19 +410,21 @@ async def bot_diagnostic():
         reasons_no_live_trades.append(
             "live_trader.ready=false — see /api/live/status for detail"
         )
-    # ALWAYS append the auto-exec message — even after the user does their first
-    # manual swap, they still need to understand the bot won't autonomously fire.
-    reasons_no_live_trades.append(
-        "IMPORTANT: the bot does NOT auto-fire real trades yet — auto-execution "
-        "is NOT wired into the arbitrage monitor. You must POST /api/live/test_swap "
-        "manually to trigger a real trade. This is a deliberate safety choice."
-    )
-    # Warn if mongo auto_execute is true (users often set it thinking it enables live)
+    # ALWAYS append the auto-exec status
+    auto_arb_enabled = str(os.environ.get('AUTO_ARB_ENABLED', 'false')).lower() == 'true'
+    if not auto_arb_enabled:
+        reasons_no_live_trades.append(
+            "AUTO_ARB_ENABLED env var is not 'true' — the autonomous arbitrage "
+            "monitor is disabled. Set AUTO_ARB_ENABLED=true on Railway to activate. "
+            "It scans Jupiter round-trip quotes every 15s and fires trades when a "
+            "profitable spread ≥ AUTO_ARB_MIN_PROFIT_BPS (default 30) is found."
+        )
+    # Warn if mongo auto_execute is true (common misconception)
     if mongo_auto_execute:
         reasons_no_live_trades.append(
             "NOTE: mongo_config.auto_execute=true only affects SIMULATED fills "
             "(the sim bot writing fake trade records). It does NOT trigger real "
-            "on-chain swaps. Real swaps only happen via /api/live/test_swap."
+            "on-chain swaps. Real autonomous swaps require AUTO_ARB_ENABLED=true."
         )
 
     return {
@@ -562,7 +603,7 @@ async def live_trades(limit: int = 25):
         # This filter avoids picking up simulation-bot records that happen to have
         # simulation=false (which occurs when the Mongo `config.simulation_mode` was toggled).
         cursor = db.trades.find({
-            "type": {"$in": ["live_manual_swap"]},
+            "type": {"$in": ["live_manual_swap", "live_auto_arb"]},
             "signature": {"$ne": None},
         }).sort("created_at", -1).limit(limit)
         docs = []
@@ -588,7 +629,7 @@ async def live_summary():
     today = datetime.now(timezone.utc).date().isoformat()
     try:
         cursor = db.trades.find({
-            "type": {"$in": ["live_manual_swap"]},
+            "type": {"$in": ["live_manual_swap", "live_auto_arb"]},
             "signature": {"$ne": None},
             "created_at": {"$gte": today}
         })

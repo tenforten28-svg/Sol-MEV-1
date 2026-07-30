@@ -23,7 +23,9 @@ DB_NAME = be_env.get("DB_NAME")
 assert BASE_URL, "REACT_APP_BACKEND_URL missing from /app/frontend/.env"
 assert MONGO_URL and DB_NAME, "MONGO_URL/DB_NAME missing from /app/backend/.env"
 
-AUTO_EXEC_MARKERS = ("auto-execution", "not wired")
+# Iteration 6: the old "auto-execution is NOT wired" reason was replaced by the
+# AUTO_ARB_ENABLED gating reason (auto-exec is wired now, just env-gated).
+AUTO_EXEC_MARKERS = ("auto_arb_enabled", "disabled")
 AUTO_EXEC_NOTE_MARKERS = ("auto_execute=true", "simulated")
 
 

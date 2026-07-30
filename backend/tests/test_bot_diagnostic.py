@@ -109,8 +109,9 @@ def test_reasons_contains_all_four_default_items(diag):
     assert "live_trading_enabled" in reasons
     assert "simulation_mode" in reasons
     assert "solana_private_key" in reasons
-    assert "auto-execution" in reasons and "not wired" in reasons, \
-        "CRITICAL: must state auto-execution is NOT wired"
+    # Iteration 6: auto-exec IS now wired but gated by AUTO_ARB_ENABLED env var
+    assert "auto_arb_enabled" in reasons and "disabled" in reasons, \
+        "CRITICAL: must state AUTO_ARB_ENABLED gating reason"
 
 
 def test_verdict_short_says_not_active(diag):
