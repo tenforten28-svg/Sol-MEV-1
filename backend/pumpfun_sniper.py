@@ -177,9 +177,9 @@ class PumpFunSniper:
             "connection_count": self.connection_count,
             "last_error": self.last_error,
             "note": (
-                "This is a DETECTION-ONLY module. It records new pump.fun mints "
-                "to MongoDB but does NOT auto-buy. Auto-buy requires a separate "
-                "safety review before enabling."
+                "New-mint detector. If PUMPFUN_AUTO_BUY_ENABLED=true AND "
+                "live_trader is ready, each detection is routed to the auto-buyer "
+                "(direct bonding-curve buy via PumpPortal Local API + QuickNode)."
             ),
         }
 

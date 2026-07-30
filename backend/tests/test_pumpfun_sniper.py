@@ -319,8 +319,10 @@ class TestPumpFunEndpoints:
         assert isinstance(d["connection_count"], int)
         assert d["last_detection_at"] is None
         assert d["last_error"] is None
-        assert "DETECTION-ONLY" in d["note"]
-        assert "does NOT auto-buy" in d["note"]
+        # Note text updated in iteration 12: detections are now routed to the
+        # auto-buyer, which remains gated behind PUMPFUN_AUTO_BUY_ENABLED=false.
+        assert "detector" in d["note"].lower()
+        assert "PUMPFUN_AUTO_BUY_ENABLED" in d["note"]
 
     def test_detections_endpoint(self, api):
         r = api.get(f"{BASE_URL}/api/live/pumpfun/detections?limit=50", timeout=30)

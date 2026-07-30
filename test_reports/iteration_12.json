@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 12: Validated the rewritten Pump.fun auto-buy module (PumpPortal Local API + local signing + QuickNode RPC) and the new PumpfunPanel UI. Added /app/backend/tests/test_pumpfun_autobuy_api.py (20 tests: endpoint shape, safe defaults, budget math, mongo _id leakage, static + runtime verification of the disabled gate, 10-endpoint regression sweep). Full backend suite: 297/297 passing. Frontend: dashboard renders, pumpfun-panel + both badges (Detector: OFF / Auto-Buy: SAFE) + all 6 stat tiles + both lists render with no console errors and LiveTradingPanel intact. NO trading flag was ever enabled; PumpPortal was never called (confirmed buys_fired stayed 0 after a direct maybe_buy() invocation).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/live/pumpfun/status|/detections|/autobuy_status|/positions", "issue": "All four handlers catch Exception and return HTTP 200 with an {\"error\": ...} body instead of 500. Real backend failures will look healthy to monitoring/clients. Tests had to assert absence of an 'error' key to compensate."},
+      {"endpoint": "pumpfun_autobuy (lifecycle)", "issue": "aiohttp ClientSession created lazily in _http() is never closed and the monitor_positions() task is never cancelled in the lifespan shutdown block -> session/task leak on reload."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PumpfunPanel", "issues": ["Stat component builds the class dynamically as `border-${tone}-800`; Tailwind JIT cannot see interpolated class names, so the tone prop is dead code and the border only renders because 'border-slate-800' happens to exist elsewhere in the bundle. Use a static class map.", "Footer disclaimer text uses text-slate-500 at 10px on a near-black background - borderline contrast/legibility."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pumpfun_autobuy_api.py",
+    "/app/backend/tests/test_pumpfun_sniper.py",
+    "/app/test_reports/pytest/pumpfun_it12.xml",
+    "/app/test_reports/pytest/full_it12.xml"
+  ],
+  "action_items": [
+    "HIGH (financial correctness): take_profit_mult and stop_loss_mult are exposed in /autobuy_status and advertised in the UI config strip ('TP/SL: 2x / 0.5x'), but _evaluate_position() only ever returns 'time_limit' - TP/SL are NEVER enforced. A sniped position can go to -100% and will only be sold after hold_max_seconds. Either implement price-based exits (pumpportal sell quote or bonding-curve state read) or mark them as 'not enforced' in both status payload and UI so the operator is not misled.",
+    "maybe_buy() debits day_spent_sol and sets last_buy_at BEFORE knowing if the tx confirmed, so failed/dropped txs still burn the daily budget. Confirm this conservative behaviour is intended, or only debit on success.",
+    "Position.token_amount is always 0.0 and never populated; the exit path sells '100%' of the token account. Remove the field or fill it from the post-tx balance so position PnL can ever be computed.",
+    "Return proper 5xx (or a machine-readable status flag) from the four pumpfun endpoints instead of 200 + {'error': ...}.",
+    "Close the aiohttp session and cancel monitor_positions() during app shutdown.",
+    "Replace the dynamic `border-${tone}-800` Tailwind class in PumpfunPanel Stat with a static variant map.",
+    "server.py is 1281 lines - consider splitting the pumpfun/live routers into separate modules."
+  ],
+  "critical_code_review_comments": [
+    "SAFETY VERIFIED: maybe_buy()'s first conditional is `if not self.cfg.enabled` returning {'ok': False, 'reason': 'auto-buy disabled (PUMPFUN_AUTO_BUY_ENABLED=false)'} before any network call; a direct runtime invocation confirmed buys_fired==0 and no PumpPortal request. lt.ready is the second gate. backend/.env has no PUMPFUN_*/LIVE_TRADING_ENABLED armed.",
+    "_check_mint_safety() fails CLOSED: on 'no rpc' or an RPC exception it returns a dict without 'authorities_safe', so require_authorities_revoked rejects the buy. Correct default.",
+    "_sign_and_send() dereferences self.lt.cfg.rpc_url and self.lt.wallet with no local null-guard; safe only because lt.ready gates the path. Add an explicit assert to avoid future regressions.",
+    "TP/SL config is surfaced but unimplemented - the most misleading part of the module for a money-moving feature."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pumpfun_autobuy_api.py (new)",
+    "/app/backend/tests/test_pumpfun_sniper.py (stale assertion updated: status note no longer contains 'DETECTION-ONLY'/'does NOT auto-buy' now that detections route to the gated auto-buyer)"
+  ],
+  "success_rate": {"backend": "100% (297/297 pytest, incl. 20 new pumpfun tests)", "frontend": "100% (14/14 UI assertions)"},
+  "seed_data_creation": "None. All tests are read-only; no documents were written to pumpfun_detections / pumpfun_positions / trades.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest with `-p no:anchorpy` (the anchorpy pytest plugin imports pytest_xprocess which is not installed and aborts collection otherwise). New suite: /app/backend/tests/test_pumpfun_autobuy_api.py. The PumpPortal build/sign/send path is UNTESTED by design - it sits behind PUMPFUN_AUTO_BUY_ENABLED=false and must never be enabled in the preview env. The only outstanding functional gap is unenforced TP/SL in pumpfun_autobuy._evaluate_position().",
+  "rca_of_the_issue": "The one real regression found was a stale test expectation in test_pumpfun_sniper.py asserting the /status note still said 'DETECTION-ONLY'; the note was intentionally reworded when autobuy wiring landed, so the test (not the app) was updated. A second failure was in my own new test using the deprecated asyncio.get_event_loop() which raises 'no current event loop' when run inside the full suite; switched to asyncio.run()."
+}

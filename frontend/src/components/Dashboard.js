@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { TrendingUp, TrendingDown, Activity, DollarSign, Target, Zap, Play, Pause } from 'lucide-react';
 import LiveTradingPanel from './LiveTradingPanel';
+import PumpfunPanel from './PumpfunPanel';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -165,6 +166,7 @@ const Dashboard = () => {
       {/* LIVE TRADING PANEL — separate from simulation stats below */}
       <div className="max-w-7xl mx-auto">
         <LiveTradingPanel />
+        <PumpfunPanel />
       </div>
 
       {/* Stats Cards */}

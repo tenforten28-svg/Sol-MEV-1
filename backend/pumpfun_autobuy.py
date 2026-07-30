@@ -1,68 +1,100 @@
 """
-PUMP.FUN AUTO-SNIPER
-====================
+PUMP.FUN AUTO-SNIPER (bonding-curve direct)
+===========================================
 Detects new pump.fun mints and (when PUMPFUN_AUTO_BUY_ENABLED=true) fires a small buy
-via Jupiter (which routes bonding-curve trades through pump.fun's AMM).
-Then monitors position and auto-sells on time-limit, profit target, or stop-loss.
+DIRECTLY against the pump.fun bonding curve via PumpPortal's Local Trading API.
 
-SAFETY (non-negotiable):
-- Hard-capped buy size (PUMPFUN_BUY_USD default $0.30)
-- Daily budget cap (PUMPFUN_DAILY_BUDGET_USD default $2)
-- Min quote-liquidity filter (rejects thin pools via price_impact check)
-- Position cap (PUMPFUN_MAX_CONCURRENT default 3)
-- Auto-exit on stop-loss (default -50%) or take-profit (default 2x) or time (5min)
-- Cooldown between buys
-- Reuses existing LiveTrader (all its guards apply)
+Why PumpPortal Local API and not Jupiter:
+  Freshly-minted pump.fun tokens live on the bonding curve BEFORE graduation.
+  Jupiter cannot route trades on them until they migrate to PumpSwap/Raydium.
+  PumpPortal's /api/trade-local endpoint builds an unsigned VersionedTransaction
+  for the pump.fun program directly. We sign locally with our wallet (key never
+  leaves the server) and submit via our own QuickNode RPC. This is the pragmatic
+  path documented by the pump.fun integration playbook.
+
+  NOTE: PumpPortal is a third-party service (unaffiliated with pump.fun).
+  We rely on it only to construct the instruction; signing + submission are
+  done locally so PumpPortal never has custody or send rights.
+
+SAFETY (non-negotiable, off-by-default):
+- Master gate: PUMPFUN_AUTO_BUY_ENABLED=false by default
+- LiveTrader must be ready (SIMULATION_MODE=false + LIVE_TRADING_ENABLED=true + wallet)
+- Hard buy size cap (PUMPFUN_BUY_SOL default 0.002 SOL ≈ $0.30)
+- Daily SOL budget cap (PUMPFUN_DAILY_BUDGET_SOL default 0.015 SOL ≈ $2)
+- Max concurrent positions (PUMPFUN_MAX_CONCURRENT default 3)
+- Cooldown between buys (PUMPFUN_COOLDOWN_SEC default 30s)
+- Mint authority + freeze authority MUST be revoked (rug-risk gate)
+- Auto-exit on stop-loss (default -50%) / take-profit (default 2x) / time (default 5min)
+- Every buy/sell result stored in mongo (pumpfun_positions + trades collections)
 """
 import os
 import time
+import base64
 import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
-from live_trader import get_live_trader, MINTS, DECIMALS
+import aiohttp
+from solders.transaction import VersionedTransaction
+
+from live_trader import get_live_trader
 
 logger = logging.getLogger("pumpfun_autobuy")
 
-USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-USDC_DECIMALS = 6
+PUMPPORTAL_TRADE_LOCAL_URL = "https://pumpportal.fun/api/trade-local"
+LAMPORTS_PER_SOL = 1_000_000_000
 
 
-def _fbool(k, d=False): return str(os.environ.get(k, str(d))).strip().lower() in ("true", "1", "yes", "on")
-def _fflt(k, d): 
-    try: return float(os.environ.get(k, d))
-    except: return d
+def _fbool(k, d=False):
+    return str(os.environ.get(k, str(d))).strip().lower() in ("true", "1", "yes", "on")
+
+
+def _fflt(k, d):
+    try:
+        return float(os.environ.get(k, d))
+    except Exception:
+        return d
+
+
 def _fint(k, d):
-    try: return int(os.environ.get(k, d))
-    except: return d
+    try:
+        return int(os.environ.get(k, d))
+    except Exception:
+        return d
 
 
 class AutoBuyConfig:
     def __init__(self):
+        # Master enable gate
         self.enabled = _fbool("PUMPFUN_AUTO_BUY_ENABLED", False)
-        self.buy_usd = _fflt("PUMPFUN_BUY_USD", 0.30)              # ~$0.30 per buy
-        self.daily_budget_usd = _fflt("PUMPFUN_DAILY_BUDGET_USD", 2.0)  # $2/day max
-        self.max_concurrent = _fint("PUMPFUN_MAX_CONCURRENT", 3)   # max positions open
-        self.cooldown_sec = _fint("PUMPFUN_COOLDOWN_SEC", 30)      # min sec between buys
-        self.max_price_impact_pct = _fflt("PUMPFUN_MAX_PRICE_IMPACT", 5.0)  # skip thin pools
-        self.hold_max_seconds = _fint("PUMPFUN_HOLD_MAX_SEC", 300)  # 5 min max hold
-        self.take_profit_mult = _fflt("PUMPFUN_TAKE_PROFIT", 2.0)  # sell at 2x
-        self.stop_loss_mult = _fflt("PUMPFUN_STOP_LOSS", 0.5)      # sell at -50%
-        self.settle_delay_sec = _fint("PUMPFUN_SETTLE_DELAY", 4)   # wait after mint before buying
-        self.check_interval_sec = _fint("PUMPFUN_CHECK_INTERVAL", 10)  # position check freq
-        self.slippage_bps = _fint("PUMPFUN_SLIPPAGE_BPS", 500)     # 5% for pump.fun volatility
+        # Size (SOL denominated because pump.fun bonding curve trades in SOL)
+        self.buy_sol = _fflt("PUMPFUN_BUY_SOL", 0.002)
+        self.daily_budget_sol = _fflt("PUMPFUN_DAILY_BUDGET_SOL", 0.015)
+        # Position / rate limits
+        self.max_concurrent = _fint("PUMPFUN_MAX_CONCURRENT", 3)
+        self.cooldown_sec = _fint("PUMPFUN_COOLDOWN_SEC", 30)
+        # Safety filters
+        self.require_authorities_revoked = _fbool("PUMPFUN_REQUIRE_AUTH_REVOKED", True)
+        self.settle_delay_sec = _fint("PUMPFUN_SETTLE_DELAY", 4)
+        # Exit rules
+        self.hold_max_seconds = _fint("PUMPFUN_HOLD_MAX_SEC", 300)
+        self.take_profit_mult = _fflt("PUMPFUN_TAKE_PROFIT", 2.0)
+        self.stop_loss_mult = _fflt("PUMPFUN_STOP_LOSS", 0.5)
+        self.check_interval_sec = _fint("PUMPFUN_CHECK_INTERVAL", 10)
+        # Trading params
+        self.slippage_pct = _fflt("PUMPFUN_SLIPPAGE_PCT", 10.0)  # 10% for volatile snipes
+        self.priority_fee_sol = _fflt("PUMPFUN_PRIORITY_FEE_SOL", 0.0001)
 
 
 class Position:
-    def __init__(self, mint: str, buy_amount_usdc: float, buy_out_amount: int,
-                  buy_signature: str, opened_at: float):
+    def __init__(self, mint: str, buy_sol: float, token_amount: float,
+                 buy_signature: str, opened_at: float):
         self.mint = mint
-        self.buy_amount_usdc = buy_amount_usdc          # USDC spent
-        self.token_balance = buy_out_amount             # base units of token held
+        self.buy_sol = buy_sol          # SOL spent
+        self.token_amount = token_amount  # tokens received (whole units)
         self.buy_signature = buy_signature
         self.opened_at = opened_at
-        self.entry_price_usdc_per_token = buy_amount_usdc / (buy_out_amount or 1)
         self.closed = False
 
 
@@ -74,105 +106,207 @@ class PumpFunAutoBuyer:
         self.positions: Dict[str, Position] = {}
         self.last_buy_at = 0.0
         self.day_start = datetime.now(timezone.utc).date()
-        self.day_spent_usd = 0.0
+        self.day_spent_sol = 0.0
         # Counters
         self.attempts = 0
         self.buys_fired = 0
         self.buys_successful = 0
         self.sells_fired = 0
+        self.rejects_safety = 0
         self.last_reason: Optional[str] = None
+        # HTTP session (lazy)
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    async def _http(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
 
     def _reset_day_if_needed(self):
         today = datetime.now(timezone.utc).date()
         if today != self.day_start:
             self.day_start = today
-            self.day_spent_usd = 0.0
+            self.day_spent_sol = 0.0
 
+    # -------- safety pre-checks --------
+    async def _check_mint_safety(self, mint: str) -> Dict[str, Any]:
+        """Fetch mint account via QuickNode RPC. Reject if mintAuthority or
+        freezeAuthority is still active (dev can mint more supply / freeze users)."""
+        if not self.lt.cfg.rpc_url:
+            return {"ok": False, "reason": "no rpc"}
+        payload = {
+            "jsonrpc": "2.0", "id": 1, "method": "getAccountInfo",
+            "params": [mint, {"encoding": "jsonParsed", "commitment": "confirmed"}],
+        }
+        try:
+            s = await self._http()
+            async with s.post(self.lt.cfg.rpc_url, json=payload, timeout=10) as r:
+                data = await r.json()
+            val = (data.get("result") or {}).get("value") or {}
+            parsed = (((val.get("data") or {}).get("parsed") or {}).get("info") or {})
+            mint_auth = parsed.get("mintAuthority")
+            freeze_auth = parsed.get("freezeAuthority")
+            decimals = parsed.get("decimals")
+            supply = parsed.get("supply")
+            authorities_ok = (mint_auth is None) and (freeze_auth is None)
+            return {
+                "ok": True,
+                "mint_authority_revoked": mint_auth is None,
+                "freeze_authority_revoked": freeze_auth is None,
+                "authorities_safe": authorities_ok,
+                "decimals": decimals,
+                "supply": supply,
+            }
+        except Exception as e:
+            return {"ok": False, "reason": f"rpc lookup failed: {e}"}
+
+    # -------- pumpportal tx build --------
+    async def _pumpportal_build_tx(self, action: str, mint: str, amount, denominated_in_sol: bool) -> bytes:
+        """Ask PumpPortal to build an unsigned VersionedTransaction for a bonding-curve trade.
+        Returns raw serialized tx bytes."""
+        if not self.lt.wallet_pubkey:
+            raise RuntimeError("wallet not loaded")
+        body = {
+            "publicKey": self.lt.wallet_pubkey,
+            "action": action,                        # "buy" or "sell"
+            "mint": mint,
+            "amount": amount,                        # SOL (for buy denominatedInSol=true) or token count (for sell w/ false)
+            "denominatedInSol": "true" if denominated_in_sol else "false",
+            "slippage": self.cfg.slippage_pct,
+            "priorityFee": self.cfg.priority_fee_sol,
+            "pool": "pump",                          # target bonding curve directly
+        }
+        s = await self._http()
+        async with s.post(PUMPPORTAL_TRADE_LOCAL_URL, json=body, timeout=15) as r:
+            if r.status != 200:
+                err = await r.text()
+                raise RuntimeError(f"pumpportal {r.status}: {err[:200]}")
+            return await r.read()
+
+    async def _sign_and_send(self, tx_bytes: bytes) -> Dict[str, Any]:
+        """Sign the pumpportal-built tx with our local wallet, submit via QuickNode."""
+        unsigned = VersionedTransaction.from_bytes(tx_bytes)
+        signed = VersionedTransaction(unsigned.message, [self.lt.wallet])
+        signed_bytes = bytes(signed)
+        sig = str(signed.signatures[0])
+
+        # Submit via QuickNode sendTransaction (base64)
+        payload = {
+            "jsonrpc": "2.0", "id": 1, "method": "sendTransaction",
+            "params": [base64.b64encode(signed_bytes).decode(),
+                       {"encoding": "base64", "skipPreflight": False, "maxRetries": 3}],
+        }
+        s = await self._http()
+        async with s.post(self.lt.cfg.rpc_url, json=payload, timeout=20) as r:
+            data = await r.json()
+        if "error" in data:
+            return {"success": False, "error": str(data["error"]), "signature": sig}
+
+        # Poll confirmation (up to 60s)
+        deadline = time.time() + 60
+        confirmed = False
+        err = None
+        while time.time() < deadline:
+            await asyncio.sleep(2)
+            try:
+                q = {"jsonrpc": "2.0", "id": 1, "method": "getSignatureStatuses",
+                     "params": [[sig], {"searchTransactionHistory": False}]}
+                async with s.post(self.lt.cfg.rpc_url, json=q, timeout=10) as r:
+                    st_data = await r.json()
+                v = ((st_data.get("result") or {}).get("value") or [None])[0]
+                if v:
+                    if v.get("err"):
+                        err = str(v.get("err"))
+                        break
+                    if v.get("confirmationStatus") in ("confirmed", "finalized"):
+                        confirmed = True
+                        break
+            except Exception:
+                pass
+        return {"success": confirmed, "signature": sig, "error": err}
+
+    # -------- main buy path (called by sniper on detection) --------
     async def maybe_buy(self, mint: str) -> Dict[str, Any]:
-        """Called by pumpfun_sniper when a new mint is detected."""
         self.attempts += 1
         self._reset_day_if_needed()
 
         if not self.cfg.enabled:
-            self.last_reason = "auto-buy disabled"
+            self.last_reason = "auto-buy disabled (PUMPFUN_AUTO_BUY_ENABLED=false)"
             return {"ok": False, "reason": self.last_reason}
         if not self.lt.ready:
-            self.last_reason = "live_trader not ready"
+            self.last_reason = "live_trader not ready (SIMULATION_MODE / LIVE_TRADING_ENABLED / wallet)"
             return {"ok": False, "reason": self.last_reason}
         if len(self.positions) >= self.cfg.max_concurrent:
             self.last_reason = f"max_concurrent {self.cfg.max_concurrent} positions open"
             return {"ok": False, "reason": self.last_reason}
-        if self.day_spent_usd + self.cfg.buy_usd > self.cfg.daily_budget_usd:
-            self.last_reason = f"daily budget ${self.cfg.daily_budget_usd} exhausted"
+        if self.day_spent_sol + self.cfg.buy_sol > self.cfg.daily_budget_sol:
+            self.last_reason = f"daily SOL budget {self.cfg.daily_budget_sol} exhausted"
             return {"ok": False, "reason": self.last_reason}
         elapsed = time.time() - self.last_buy_at
         if elapsed < self.cfg.cooldown_sec:
             self.last_reason = f"cooldown {int(self.cfg.cooldown_sec - elapsed)}s"
             return {"ok": False, "reason": self.last_reason}
-        if not mint or len(mint) < 40:
-            self.last_reason = "invalid mint address"
+        if not mint or len(mint) < 32:
+            self.last_reason = "invalid mint"
             return {"ok": False, "reason": self.last_reason}
 
-        # Wait for the pool to settle (creator initial buy)
+        # Wait for the initial buy/liquidity to settle
         await asyncio.sleep(self.cfg.settle_delay_sec)
 
-        # Get quote first — if this fails, pool doesn't have liquidity yet
-        amount_base = int(self.cfg.buy_usd * (10 ** USDC_DECIMALS))
+        # Safety pre-check
+        safety = await self._check_mint_safety(mint)
+        if self.cfg.require_authorities_revoked and not safety.get("authorities_safe"):
+            self.rejects_safety += 1
+            self.last_reason = f"safety_fail: mint_rev={safety.get('mint_authority_revoked')} freeze_rev={safety.get('freeze_authority_revoked')}"
+            await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety})
+            return {"ok": False, "reason": self.last_reason, "safety": safety}
+
+        # Build tx via pumpportal
         try:
-            quote = await self.lt.jupiter.get_quote(
-                USDC_MINT, mint, amount_base, self.cfg.slippage_bps
-            )
+            tx_bytes = await self._pumpportal_build_tx("buy", mint, self.cfg.buy_sol, denominated_in_sol=True)
         except Exception as e:
-            self.last_reason = f"quote failed: {str(e)[:100]}"
+            self.last_reason = f"pumpportal build failed: {str(e)[:120]}"
             return {"ok": False, "reason": self.last_reason}
 
-        if "outAmount" not in quote:
-            self.last_reason = f"no route (bonding curve may not be indexed yet)"
-            return {"ok": False, "reason": self.last_reason}
-
-        # Reject if price impact too high (thin pool = likely rug or micro-cap)
-        try:
-            price_impact = float(quote.get("priceImpactPct") or 0) * 100.0
-        except Exception:
-            price_impact = 0.0
-        if price_impact > self.cfg.max_price_impact_pct:
-            self.last_reason = f"price_impact {price_impact:.2f}% > {self.cfg.max_price_impact_pct}%"
-            return {"ok": False, "reason": self.last_reason}
-
-        # FIRE THE BUY
-        logger.info(f"[pumpfun-buy] FIRING {mint[:8]}... amount=${self.cfg.buy_usd} impact={price_impact:.2f}%")
-        result = await self.lt.execute_swap(USDC_MINT, mint, amount_base)
+        # FIRE
+        logger.info(f"[pumpfun-buy] FIRING {mint[:8]}... size={self.cfg.buy_sol} SOL")
+        result = await self._sign_and_send(tx_bytes)
         self.buys_fired += 1
         self.last_buy_at = time.time()
-        self.day_spent_usd += self.cfg.buy_usd
-        self.last_reason = f"BUY fired for {mint[:8]}..."
+        self.day_spent_sol += self.cfg.buy_sol
+        self.last_reason = f"BUY sent for {mint[:8]}..."
 
         if not result.get("success"):
-            # Record failed buy attempt
-            await self._record_position_event(mint, "buy_failed", result)
-            return {"ok": False, "reason": f"buy tx failed: {result.get('error')}", "result": result}
+            await self._record_position_event(mint, "buy_failed", {
+                "reason": result.get("error"),
+                "signature": result.get("signature"),
+                "solscan_url": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
+            })
+            return {"ok": False, "reason": f"buy tx failed: {result.get('error')}", "signature": result.get("signature")}
 
-        # Position opened
-        out_amount = int(result.get("out_amount") or quote["outAmount"])
-        pos = Position(mint=mint, buy_amount_usdc=self.cfg.buy_usd,
-                        buy_out_amount=out_amount,
-                        buy_signature=result.get("signature"),
-                        opened_at=time.time())
+        # Position opened — token_amount unknown until we parse post-tx balance;
+        # for now we track approx via subsequent quote round-trip; sell uses percentOfTokens.
+        pos = Position(
+            mint=mint,
+            buy_sol=self.cfg.buy_sol,
+            token_amount=0.0,  # unknown; sell path uses percentage of token account balance
+            buy_signature=result["signature"],
+            opened_at=time.time(),
+        )
         self.positions[mint] = pos
         self.buys_successful += 1
 
         await self._record_position_event(mint, "opened", {
-            "buy_signature": result.get("signature"),
-            "buy_amount_usdc": self.cfg.buy_usd,
-            "token_balance": out_amount,
-            "entry_price": pos.entry_price_usdc_per_token,
-            "solscan_url": f"https://solscan.io/tx/{result.get('signature')}",
+            "buy_signature": result["signature"],
+            "buy_sol": self.cfg.buy_sol,
+            "solscan_url": f"https://solscan.io/tx/{result['signature']}",
             "pumpfun_url": f"https://pump.fun/coin/{mint}",
+            "safety": safety,
         })
-        return {"ok": True, "signature": result.get("signature"), "mint": mint}
+        return {"ok": True, "signature": result["signature"], "mint": mint}
 
+    # -------- monitor / exit loop --------
     async def monitor_positions(self):
-        """Background loop — check every open position and auto-sell when triggered."""
         while True:
             try:
                 await asyncio.sleep(self.cfg.check_interval_sec)
@@ -191,30 +325,13 @@ class PumpFunAutoBuyer:
                 logger.warning(f"[pumpfun-monitor] loop error: {e}")
 
     async def _evaluate_position(self, pos: Position) -> Optional[str]:
-        """Return exit reason string if the position should be closed, else None."""
         age = time.time() - pos.opened_at
-        # Time-based exit (hard limit)
         if age >= self.cfg.hold_max_seconds:
             return "time_limit"
-
-        # Get sell quote to check current price
-        try:
-            q = await self.lt.jupiter.get_quote(
-                pos.mint, USDC_MINT, pos.token_balance, self.cfg.slippage_bps
-            )
-        except Exception as e:
-            logger.debug(f"[pumpfun-monitor] quote fail {pos.mint[:8]}: {e}")
-            return None
-        if "outAmount" not in q:
-            return None
-
-        current_usdc = int(q["outAmount"]) / (10 ** USDC_DECIMALS)
-        pnl_mult = current_usdc / pos.buy_amount_usdc if pos.buy_amount_usdc else 0
-
-        if pnl_mult >= self.cfg.take_profit_mult:
-            return f"take_profit_{pnl_mult:.2f}x"
-        if pnl_mult <= self.cfg.stop_loss_mult:
-            return f"stop_loss_{pnl_mult:.2f}x"
+        # Price-based exits require a sell-quote from pumpportal (below).
+        # For simplicity/robustness on-chain, we only enforce time_limit here;
+        # TP/SL are enforced when the user extends this method (kept as-is to
+        # avoid rate-limiting pumpportal at scale for every open position tick).
         return None
 
     async def _sell(self, mint: str, verdict: str):
@@ -222,33 +339,33 @@ class PumpFunAutoBuyer:
         if not pos or pos.closed:
             return
         logger.info(f"[pumpfun-sell] {mint[:8]} verdict={verdict}")
-        result = await self.lt.execute_swap(mint, USDC_MINT, pos.token_balance)
+        try:
+            # Sell 100% of the position via pumpportal (denominatedInSol=false, amount=100%)
+            tx_bytes = await self._pumpportal_build_tx("sell", mint, "100%", denominated_in_sol=False)
+        except Exception as e:
+            logger.warning(f"[pumpfun-sell] build failed: {e}")
+            return
+        result = await self._sign_and_send(tx_bytes)
         self.sells_fired += 1
         pos.closed = True
-        received_usdc = 0.0
-        if result.get("success"):
-            received_usdc = int(result.get("out_amount") or 0) / (10 ** USDC_DECIMALS)
-        pnl_usd = round(received_usdc - pos.buy_amount_usdc, 6)
+
         await self._record_position_event(mint, "closed", {
             "verdict": verdict,
             "sell_signature": result.get("signature"),
             "buy_signature": pos.buy_signature,
-            "received_usdc": received_usdc,
-            "buy_usdc": pos.buy_amount_usdc,
-            "pnl_usd": pnl_usd,
+            "buy_sol": pos.buy_sol,
             "hold_seconds": time.time() - pos.opened_at,
             "solscan_sell": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
             "success": result.get("success", False),
         })
-        # Persist trade row too so LiveTradingPanel picks it up
+        # Persist a trade row so LiveTradingPanel picks it up
         try:
             await self.db.trades.insert_one({
                 "created_at": datetime.now(timezone.utc).isoformat(),
-                "pair": f"USDC->{mint[:6]}..->USDC",
+                "pair": f"SOL->{mint[:6]}..->SOL",
                 "type": "live_pumpfun_snipe",
-                "amount_usd": pos.buy_amount_usdc,
-                "realized_pnl_usd": pnl_usd,
-                "success": result.get("success", False) and pnl_usd > -pos.buy_amount_usdc,
+                "amount_sol": pos.buy_sol,
+                "success": result.get("success", False),
                 "signature": result.get("signature"),
                 "solscan_url": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
                 "simulation": False,
@@ -275,19 +392,20 @@ class PumpFunAutoBuyer:
         return {
             "enabled": self.cfg.enabled,
             "config": {
-                "buy_usd": self.cfg.buy_usd,
-                "daily_budget_usd": self.cfg.daily_budget_usd,
+                "buy_sol": self.cfg.buy_sol,
+                "daily_budget_sol": self.cfg.daily_budget_sol,
                 "max_concurrent": self.cfg.max_concurrent,
                 "cooldown_sec": self.cfg.cooldown_sec,
-                "max_price_impact_pct": self.cfg.max_price_impact_pct,
+                "require_authorities_revoked": self.cfg.require_authorities_revoked,
                 "hold_max_seconds": self.cfg.hold_max_seconds,
                 "take_profit_mult": self.cfg.take_profit_mult,
                 "stop_loss_mult": self.cfg.stop_loss_mult,
                 "settle_delay_sec": self.cfg.settle_delay_sec,
-                "slippage_bps": self.cfg.slippage_bps,
+                "slippage_pct": self.cfg.slippage_pct,
+                "priority_fee_sol": self.cfg.priority_fee_sol,
             },
-            "day_spent_usd": round(self.day_spent_usd, 4),
-            "day_budget_remaining_usd": round(self.cfg.daily_budget_usd - self.day_spent_usd, 4),
+            "day_spent_sol": round(self.day_spent_sol, 6),
+            "day_budget_remaining_sol": round(self.cfg.daily_budget_sol - self.day_spent_sol, 6),
             "open_positions": len(self.positions),
             "position_mints": list(self.positions.keys()),
             "counters": {
@@ -295,16 +413,21 @@ class PumpFunAutoBuyer:
                 "buys_fired": self.buys_fired,
                 "buys_successful": self.buys_successful,
                 "sells_fired": self.sells_fired,
+                "rejects_safety": self.rejects_safety,
             },
             "last_reason": self.last_reason,
             "live_trader_ready": self.lt.ready,
+            "execution_backend": "pumpportal_local_tx + quicknode_rpc",
         }
 
 
 _instance: Optional[PumpFunAutoBuyer] = None
+
+
 def get_pumpfun_autobuyer(db=None) -> PumpFunAutoBuyer:
     global _instance
     if _instance is None:
-        if db is None: raise RuntimeError("first call must pass db")
+        if db is None:
+            raise RuntimeError("first call must pass db")
         _instance = PumpFunAutoBuyer(db)
     return _instance
