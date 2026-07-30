@@ -159,6 +159,7 @@ export default function PumpfunPanel() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           <div>Buy: <span className="text-fuchsia-300">{cfg.buy_sol ?? "—"} SOL</span></div>
           <div>Slippage: <span className="text-fuchsia-300">{cfg.slippage_pct ?? "—"}%</span></div>
+          <div>Max dev hold: <span className="text-fuchsia-300">{cfg.max_dev_hold_pct ?? "—"}%</span></div>
           <div>Priority fee: <span className="text-fuchsia-300">{cfg.priority_fee_sol ?? "—"} SOL</span></div>
           <div>Hold max: <span className="text-fuchsia-300">{cfg.hold_max_seconds ?? "—"}s</span></div>
           <div>TP/SL: <span className="text-slate-400">advisory ({cfg.take_profit_mult ?? "—"}x / {cfg.stop_loss_mult ?? "—"}x, time-limit only)</span></div>
@@ -271,6 +272,14 @@ export default function PumpfunPanel() {
               <div className="mt-1 text-slate-400 flex flex-wrap gap-x-3">
                 {p.verdict && <span>verdict: <span className="text-slate-200">{p.verdict}</span></span>}
                 {p.buy_sol != null && <span>buy: {p.buy_sol} SOL</span>}
+                {p.dev?.dev_hold_pct != null && (
+                  <span>
+                    dev holds:{" "}
+                    <span className={p.dev.within_limit ? "text-emerald-300" : "text-red-300"}>
+                      {p.dev.dev_hold_pct}%
+                    </span>
+                  </span>
+                )}
                 {p.hold_seconds != null && <span>held: {Math.round(p.hold_seconds)}s</span>}
                 {p.reason && <span className="text-amber-300">{p.reason}</span>}
                 {p.solscan_url && (

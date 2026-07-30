@@ -85,6 +85,9 @@ class AutoBuyConfig:
         # Trading params
         self.slippage_pct = _fflt("PUMPFUN_SLIPPAGE_PCT", 10.0)  # 10% for volatile snipes
         self.priority_fee_sol = _fflt("PUMPFUN_PRIORITY_FEE_SOL", 0.0001)
+        # Dev-hold rug filter — reject if creator holds more than this % of supply right after mint.
+        # Typical safe range: 5-15%. Set to 100 to disable.
+        self.max_dev_hold_pct = _fflt("PUMPFUN_MAX_DEV_HOLD_PCT", 15.0)
 
 
 class Position:
@@ -160,6 +163,71 @@ class PumpFunAutoBuyer:
         except Exception as e:
             return {"ok": False, "reason": f"rpc lookup failed: {e}"}
 
+    async def _check_dev_hold(self, signature: str, mint: str, total_supply: Optional[str]) -> Dict[str, Any]:
+        """Fetch the mint's creation tx and compute how much of the supply the creator
+        (= fee payer) is holding after their initial buy. Reject if > max_dev_hold_pct.
+
+        We use postTokenBalances from the tx meta — one RPC call, no extra queries."""
+        if not self.lt.cfg.rpc_url or not signature:
+            return {"ok": False, "reason": "no rpc or signature"}
+        payload = {
+            "jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+            "params": [signature, {
+                "encoding": "jsonParsed",
+                "commitment": "confirmed",
+                "maxSupportedTransactionVersion": 0,
+            }],
+        }
+        try:
+            s = await self._http()
+            async with s.post(self.lt.cfg.rpc_url, json=payload, timeout=10) as r:
+                data = await r.json()
+            result = data.get("result")
+            if not result:
+                return {"ok": False, "reason": "tx not found (may not be confirmed yet)"}
+
+            # Fee payer = first signer = creator on pump.fun mint tx
+            keys = ((result.get("transaction") or {}).get("message") or {}).get("accountKeys") or []
+            creator = None
+            if keys:
+                first = keys[0]
+                creator = first.get("pubkey") if isinstance(first, dict) else first
+
+            # postTokenBalances lists every touched token account with owner + balance
+            post_balances = ((result.get("meta") or {}).get("postTokenBalances") or [])
+            creator_balance_raw = 0
+            for b in post_balances:
+                if b.get("mint") != mint:
+                    continue
+                if b.get("owner") == creator:
+                    ui = b.get("uiTokenAmount") or {}
+                    try:
+                        creator_balance_raw = int(ui.get("amount") or 0)
+                    except Exception:
+                        creator_balance_raw = 0
+                    break
+
+            try:
+                supply_raw = int(total_supply or 0)
+            except Exception:
+                supply_raw = 0
+            if supply_raw <= 0:
+                return {"ok": False, "reason": "supply unknown"}
+
+            pct = (creator_balance_raw / supply_raw) * 100.0
+            return {
+                "ok": True,
+                "creator": creator,
+                "creator_balance_raw": creator_balance_raw,
+                "supply_raw": supply_raw,
+                "dev_hold_pct": round(pct, 3),
+                "within_limit": pct <= self.cfg.max_dev_hold_pct,
+                "limit_pct": self.cfg.max_dev_hold_pct,
+            }
+        except Exception as e:
+            return {"ok": False, "reason": f"tx lookup failed: {e}"}
+
+
     # -------- pumpportal tx build --------
     async def _pumpportal_build_tx(self, action: str, mint: str, amount, denominated_in_sol: bool) -> bytes:
         """Ask PumpPortal to build an unsigned VersionedTransaction for a bonding-curve trade.
@@ -226,7 +294,7 @@ class PumpFunAutoBuyer:
         return {"success": confirmed, "signature": sig, "error": err}
 
     # -------- main buy path (called by sniper on detection) --------
-    async def maybe_buy(self, mint: str) -> Dict[str, Any]:
+    async def maybe_buy(self, mint: str, signature: Optional[str] = None) -> Dict[str, Any]:
         self.attempts += 1
         self._reset_day_if_needed()
 
@@ -260,6 +328,16 @@ class PumpFunAutoBuyer:
             self.last_reason = f"safety_fail: mint_rev={safety.get('mint_authority_revoked')} freeze_rev={safety.get('freeze_authority_revoked')}"
             await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety})
             return {"ok": False, "reason": self.last_reason, "safety": safety}
+
+        # Dev-hold rug filter (if we have the mint tx signature)
+        dev = None
+        if signature and self.cfg.max_dev_hold_pct < 100.0:
+            dev = await self._check_dev_hold(signature, mint, safety.get("supply"))
+            if dev.get("ok") and not dev.get("within_limit"):
+                self.rejects_safety += 1
+                self.last_reason = f"dev_hold_fail: {dev.get('dev_hold_pct')}% > {self.cfg.max_dev_hold_pct}% limit"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev})
+                return {"ok": False, "reason": self.last_reason, "dev": dev}
 
         # Build tx via pumpportal
         try:
@@ -302,6 +380,7 @@ class PumpFunAutoBuyer:
             "solscan_url": f"https://solscan.io/tx/{result['signature']}",
             "pumpfun_url": f"https://pump.fun/coin/{mint}",
             "safety": safety,
+            "dev": dev,
         })
         return {"ok": True, "signature": result["signature"], "mint": mint}
 
@@ -402,6 +481,7 @@ class PumpFunAutoBuyer:
                 "settle_delay_sec": self.cfg.settle_delay_sec,
                 "slippage_pct": self.cfg.slippage_pct,
                 "priority_fee_sol": self.cfg.priority_fee_sol,
+                "max_dev_hold_pct": self.cfg.max_dev_hold_pct,
             },
             "day_spent_sol": round(self.day_spent_sol, 6),
             "day_budget_remaining_sol": round(self.cfg.daily_budget_sol - self.day_spent_sol, 6),

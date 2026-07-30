@@ -159,7 +159,7 @@ class PumpFunSniper:
                 try:
                     from pumpfun_autobuy import get_pumpfun_autobuyer
                     ab = get_pumpfun_autobuyer(self.db)
-                    asyncio.create_task(ab.maybe_buy(candidate_mint))
+                    asyncio.create_task(ab.maybe_buy(candidate_mint, signature=sig))
                 except Exception as e:
                     logger.debug(f"[pumpfun] autobuy trigger failed: {e}")
 
