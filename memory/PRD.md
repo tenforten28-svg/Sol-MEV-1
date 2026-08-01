@@ -28,7 +28,13 @@ User uploaded a Solana MEV/arbitrage bot zip, chose to deploy on Railway (~$5/mo
   7. Token-2022 honeypot extensions rejected: transferFeeConfig, permanentDelegate, nonTransferable, transferHook, mintCloseAuthority, defaultAccountState=Frozen
 - ✅ **[2026-02] Pump.fun direct bonding-curve auto-buy** — PumpPortal Local API + local signing. Master gate `PUMPFUN_AUTO_BUY_ENABLED=false` by default. Time-limit auto-exit.
 - ✅ **[2026-02] Pump.fun frontend panel** — detector + auto-buy status, 6 stat tiles, 9-item config strip, detection list with links, position event rows showing dev%/top1%/top10%/curve SOL inline color-coded.
-- ✅ **79/79 anti-rug + fail-closed regression tests passing** (iteration_15).
+- ✅ **[2026-02] Graduation snipe system** — dual-launchpad WSS monitor + fade-the-dump executor:
+  - **Monitor** (`graduation_monitor.py`): `logsSubscribe` on PumpSwap (`pAMMBay...`) + Raydium LaunchLab (`LanMV9...`) programs. Parses migration tx via `getTransaction`, extracts mint/pool/reserves, emits normalized `{source, mint, pool_address, dex, reserves_sol, signature, latency_ms, slot}` event. Dedup via mongo unique index on `(signature, source)`. Auto-reconnect w/ exponential backoff.
+  - **Executor** (`graduation_executor.py`): fade-the-dump strategy — 3s settle delay, then Jupiter buy via existing `live_trader` (reuses safety gates + Jito). REAL price-based TP/SL via Jupiter reverse quotes. All decisions locked by `asyncio.Lock` (no race conditions). Kill-switch re-check after settle. Pre-reserves slot before sleep. Refunds budget on failed buy.
+  - **Endpoints**: `/api/live/graduation/{status,events,positions}` + `POST /api/live/graduation/replay` (signature backtest) + `POST /api/live/emergency_stop` (in-process kill switch).
+  - **Frontend**: `GraduationPanel.jsx` with monitor+executor badges, 6 stat tiles, 9-item config strip, detection list w/ latency, position events w/ real PnL %, emergency-stop button.
+  - **Filters**: `min_pool_sol` (default 50 SOL), max_concurrent (2), daily budget cap (0.02 SOL), cooldown (20s), separate `rejects_gate` vs `rejects_filter` counters.
+  - **Verified**: 28/28 tests iteration_16, all fail-closed paths + kill-switch + endpoint regression passing.
 
 ## Known limitations (honest)
 - ⚠️ TP/SL config values (`PUMPFUN_TAKE_PROFIT`, `PUMPFUN_STOP_LOSS`) are **advisory** — only `hold_max_seconds` is enforced. Price-based exits require bonding-curve on-chain decoding which is deliberately deferred. Status endpoint reports `tp_sl_enforced: false`.

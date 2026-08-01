@@ -96,9 +96,13 @@ class GraduationExecutor:
         self.buys_fired = 0
         self.buys_successful = 0
         self.sells_fired = 0
-        self.rejects_filter = 0
+        self.rejects_filter = 0        # low-liquidity rejects
+        self.rejects_gate = 0          # cooldown / budget / max_concurrent / disabled
         self.last_reason: Optional[str] = None
         self._monitor_task: Optional[asyncio.Task] = None
+        # Serialize all buy attempts so max_concurrent/budget/cooldown checks
+        # can't race with concurrent detections in the same settle window.
+        self._buy_lock = asyncio.Lock()
 
     def _reset_day_if_needed(self):
         today = datetime.now(timezone.utc).date()
@@ -117,34 +121,47 @@ class GraduationExecutor:
 
     # ---------- entry point called by graduation_monitor ----------
     async def on_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Called for every detected graduation. Returns decision dict."""
+        """Called for every detected graduation. Returns decision dict.
+        Serialized by _buy_lock so max_concurrent/budget/cooldown checks are
+        race-free even when multiple graduations arrive within the settle window."""
+        async with self._buy_lock:
+            return await self._on_event_locked(event)
+
+    async def _on_event_locked(self, event: Dict[str, Any]) -> Dict[str, Any]:
         self.events_seen += 1
         self._reset_day_if_needed()
 
         # Gate checks
         if not self.cfg.enabled:
+            self.rejects_gate += 1
             self.last_reason = "exec disabled (GRADUATION_EXEC_ENABLED=false)"
             return {"ok": False, "reason": self.last_reason}
         if not self.lt.ready:
+            self.rejects_gate += 1
             self.last_reason = "live_trader not ready"
             return {"ok": False, "reason": self.last_reason}
 
         source = event.get("source")
         if source == "pumpswap" and not self.cfg.pumpswap_enabled:
+            self.rejects_gate += 1
             self.last_reason = "pumpswap exec disabled"
             return {"ok": False, "reason": self.last_reason}
         if source == "bonk_cpmm" and not self.cfg.bonk_enabled:
+            self.rejects_gate += 1
             self.last_reason = "bonk exec disabled"
             return {"ok": False, "reason": self.last_reason}
 
         if len(self.positions) >= self.cfg.max_concurrent:
+            self.rejects_gate += 1
             self.last_reason = f"max_concurrent {self.cfg.max_concurrent} open"
             return {"ok": False, "reason": self.last_reason}
         if self.day_spent_sol + self.cfg.buy_sol > self.cfg.daily_budget_sol:
+            self.rejects_gate += 1
             self.last_reason = f"daily budget {self.cfg.daily_budget_sol} SOL exhausted"
             return {"ok": False, "reason": self.last_reason}
         elapsed = time.time() - self.last_buy_at
         if elapsed < self.cfg.cooldown_sec:
+            self.rejects_gate += 1
             self.last_reason = f"cooldown {int(self.cfg.cooldown_sec - elapsed)}s"
             return {"ok": False, "reason": self.last_reason}
 
@@ -157,13 +174,38 @@ class GraduationExecutor:
                                      {"reason": self.last_reason, "event": event})
             return {"ok": False, "reason": self.last_reason}
 
+        # Pre-reserve slot BEFORE settle so a concurrent event can't pass max_concurrent
+        mint = event["mint"]
+        # Sentinel placeholder — takes a max_concurrent slot until real buy resolves
+        self.positions[mint] = GraduationPosition(
+            mint=mint, pool=event.get("pool_address", ""), source=source,
+            buy_sol=self.cfg.buy_sol, tokens_out=0,
+            buy_signature="pending", opened_at=time.time(),
+        )
+        self.last_buy_at = time.time()
+        self.day_spent_sol += self.cfg.buy_sol
+
         # FADE THE DUMP — settle
         await asyncio.sleep(self.cfg.settle_delay_sec)
 
-        # Fire buy via Jupiter (works because post-graduation the mint is on a public AMM)
-        mint = event["mint"]
+        # Re-check kill switch after sleep (in case emergency_stop fired during settle)
+        if not self.cfg.enabled:
+            self.positions.pop(mint, None)
+            self.day_spent_sol -= self.cfg.buy_sol  # refund
+            self.rejects_gate += 1
+            self.last_reason = "kill_switch_during_settle"
+            await self._record_event(mint, "rejected",
+                                     {"reason": self.last_reason, "event": event})
+            return {"ok": False, "reason": self.last_reason}
+        if not self.lt.ready:
+            self.positions.pop(mint, None)
+            self.day_spent_sol -= self.cfg.buy_sol
+            self.rejects_gate += 1
+            self.last_reason = "live_trader_disarmed_during_settle"
+            return {"ok": False, "reason": self.last_reason}
+
+        # Fire buy via Jupiter
         amount_lamports = int(self.cfg.buy_sol * LAMPORTS_PER_SOL)
-        # Temporarily override slippage for volatile graduation snipes
         prev_slip = self.lt.cfg.slippage_bps
         self.lt.cfg.slippage_bps = self.cfg.slippage_bps
         try:
@@ -172,10 +214,11 @@ class GraduationExecutor:
             self.lt.cfg.slippage_bps = prev_slip
 
         self.buys_fired += 1
-        self.last_buy_at = time.time()
-        self.day_spent_sol += self.cfg.buy_sol
 
         if not result.get("success"):
+            # Refund slot; buy failed
+            self.positions.pop(mint, None)
+            self.day_spent_sol -= self.cfg.buy_sol  # refund unspent budget on hard failure
             self.last_reason = f"buy_failed: {result.get('error')}"
             await self._record_event(mint, "buy_failed", {
                 "reason": self.last_reason, "signature": result.get("signature"),
@@ -184,20 +227,16 @@ class GraduationExecutor:
             })
             return {"ok": False, "reason": self.last_reason, "signature": result.get("signature")}
 
-        # Extract tokens received from quote (we asked for slippage_bps tolerance)
-        # Jupiter's execute_swap returns 'out_amount' when success
+        # Fill in real position
         tokens_out = 0
         try:
             tokens_out = int(result.get("out_amount") or result.get("outAmount") or 0)
         except Exception:
             tokens_out = 0
-
-        pos = GraduationPosition(
-            mint=mint, pool=event.get("pool_address", ""), source=source,
-            buy_sol=self.cfg.buy_sol, tokens_out=tokens_out,
-            buy_signature=result["signature"], opened_at=time.time(),
-        )
-        self.positions[mint] = pos
+        pos = self.positions.get(mint)
+        if pos:
+            pos.tokens_out = tokens_out
+            pos.buy_signature = result["signature"]
         self.buys_successful += 1
         self.last_reason = f"opened {mint[:6]}.. from {source}"
 
@@ -355,6 +394,7 @@ class GraduationExecutor:
                 "buys_successful": self.buys_successful,
                 "sells_fired": self.sells_fired,
                 "rejects_filter": self.rejects_filter,
+                "rejects_gate": self.rejects_gate,
             },
             "day_spent_sol": round(self.day_spent_sol, 6),
             "day_budget_remaining_sol": round(self.cfg.daily_budget_sol - self.day_spent_sol, 6),
@@ -363,6 +403,7 @@ class GraduationExecutor:
             "last_reason": self.last_reason,
             "live_trader_ready": self.lt.ready,
             "strategy": "fade_the_dump",
+            "note": "graduation buys skip pump.fun anti-rug filters — post-graduation tokens have already price-discovered on the bonding curve, so mint/freeze/dev-hold/holder-concentration checks are intentionally not applied here. Only pool-liquidity + budget/concurrency/cooldown gates run.",
         }
 
 

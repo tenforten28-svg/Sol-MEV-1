@@ -167,7 +167,8 @@ class TestExecutorGates:
         assert st["enabled"] is False
         assert st["open_positions"] == 0
         assert set(st["counters"]) == {
-            "events_seen", "buys_fired", "buys_successful", "sells_fired", "rejects_filter"}
+            "events_seen", "buys_fired", "buys_successful", "sells_fired",
+            "rejects_filter", "rejects_gate"}
 
 
 # ---------------- API endpoints ----------------
