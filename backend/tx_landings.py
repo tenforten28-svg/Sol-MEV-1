@@ -46,7 +46,12 @@ class LandingTracker:
         extra: Optional[Dict[str, Any]] = None,
     ):
         """Persist one submission outcome. Call after your confirmation loop
-        finishes (either landed, errored, or timed out)."""
+        finishes (either landed, errored, or timed out).
+
+        Classification:
+          success=True + landed_at set → 'landed'
+          success=False + error set    → 'failed' (submit rejected or execution reverted)
+          success=False + no error     → 'timed_out' (never confirmed within deadline)"""
         ctr = self._ctr(module)
         ctr["submits"] += 1
         latency_ms = None
@@ -56,10 +61,10 @@ class LandingTracker:
             self.recent_latencies[module].append(latency_ms)
             if len(self.recent_latencies[module]) > 50:
                 self.recent_latencies[module].pop(0)
-        elif landed_at is None and not success:
-            ctr["timed_out"] += 1
-        else:
+        elif error:
             ctr["failed"] += 1
+        else:
+            ctr["timed_out"] += 1
 
         try:
             await self.db.tx_landings.insert_one({

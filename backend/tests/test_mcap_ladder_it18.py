@@ -122,8 +122,10 @@ class TestLandingTracker:
 
         async def go():
             await t.record("pumpfun_autobuy", "sig1", now, now + 1.5, True)
-            await t.record("pumpfun_autobuy", "sig2", now, None, False, "timeout")
-            await t.record("pumpfun_autobuy", "sig3", now, now + 1, False, "err")
+            # timed_out: never confirmed, no explicit error
+            await t.record("pumpfun_autobuy", "sig2", now, None, False, None)
+            # failed: explicit error surfaced (RPC rejected or on-chain revert)
+            await t.record("pumpfun_autobuy", "sig3", now, None, False, "err")
 
         asyncio.run(go())
         m = t.status()["modules"]["pumpfun_autobuy"]
@@ -543,7 +545,7 @@ class TestTrackerInstrumentation:
         res = asyncio.run(pf._sign_and_send(b"\x01" * 10))
         assert res["success"] is False
         st = txl.get_tracker().status()["modules"]["pumpfun_autobuy"]
-        assert st["submits"] == 1 and st["landed"] == 0 and st["timed_out"] == 1
+        assert st["submits"] == 1 and st["landed"] == 0 and st["failed"] == 1
         txl._instance = None
 
     def test_graduation_modules_recorded(self):

@@ -152,7 +152,8 @@ class Position:
     def __init__(self, mint: str, buy_sol: float, token_amount: float,
                  buy_signature: str, opened_at: float,
                  entry_price: float = 0.0,
-                 entry_mcap_usd: float = 0.0):
+                 entry_mcap_usd: float = 0.0,
+                 supply_raw: int = 0):
         self.mint = mint
         self.buy_sol = buy_sol          # SOL spent
         self.token_amount = token_amount  # tokens received (whole units)
@@ -162,6 +163,7 @@ class Position:
         # Ladder-exit state
         self.entry_price = entry_price   # SOL per raw token unit (from bonding curve at buy time)
         self.entry_mcap_usd = entry_mcap_usd
+        self.supply_raw = supply_raw     # on-chain total supply (raw units) — pinned at buy for consistent mcap math
         self.remaining_pct_of_original = 100.0
         self.ladder_state = LadderState()
         self.partial_sells: list = []
@@ -702,6 +704,7 @@ class PumpFunAutoBuyer:
             opened_at=time.time(),
             entry_price=entry_price,
             entry_mcap_usd=pos_entry_mcap_usd,
+            supply_raw=int(safety.get("supply") or 0),
         )
         self.positions[mint] = pos
         self.buys_successful += 1
@@ -831,7 +834,7 @@ class PumpFunAutoBuyer:
 
         if mode == "mcap":
             # Absolute USD mcap thresholds; state machine treats them as generic signal values
-            signal = await self._current_mcap_usd(pos.mint)
+            signal = await self._current_mcap_usd(pos.mint, supply_raw_hint=pos.supply_raw)
             if signal is None:
                 if hold_expired:
                     return {"action": "sell_all", "sell_pct": 100.0,
@@ -880,10 +883,7 @@ class PumpFunAutoBuyer:
         # Fee-economic gate on partial sells (mcap mode only, where signal is USD).
         # Skip a partial sell that would net less than min_sell_usd worth after fees.
         if mode == "mcap" and action.type == LadderActionType.SELL_PARTIAL:
-            approx_position_value_usd = signal_display * (pos.remaining_pct_of_original / 100.0) * (pos.buy_sol / max(pos.buy_sol, 1e-9))
-            # Rough: partial sell value = current mcap fraction * sell_pct * position share.
-            # More useful: buy_sol × (signal / entry_mcap) × sell_pct / 100 × sol_usd
-            sol_usd = _sol_usd_cache["price"] or 150.0
+            sol_usd = await self._get_sol_usd()
             if pos.entry_mcap_usd > 0:
                 ratio_from_entry = signal_display / pos.entry_mcap_usd
                 partial_value_usd = pos.buy_sol * sol_usd * ratio_from_entry * (action.sell_pct / 100.0) * (pos.remaining_pct_of_original / 100.0)

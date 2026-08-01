@@ -28,6 +28,14 @@ User uploaded a Solana MEV/arbitrage bot zip, chose to deploy on Railway (~$5/mo
   7. Token-2022 honeypot extensions rejected: transferFeeConfig, permanentDelegate, nonTransferable, transferHook, mintCloseAuthority, defaultAccountState=Frozen
 - ✅ **[2026-02] Pump.fun direct bonding-curve auto-buy** — PumpPortal Local API + local signing. Master gate `PUMPFUN_AUTO_BUY_ENABLED=false` by default. Time-limit auto-exit.
 - ✅ **[2026-02] Pump.fun frontend panel** — detector + auto-buy status, 6 stat tiles, 9-item config strip, detection list with links, position event rows showing dev%/top1%/top10%/curve SOL inline color-coded.
+- ✅ **[2026-02] Doc 1 mcap-based scaled exit + Doc 2 Phase 3 landing-rate metrics**:
+  - `PUMPFUN_LADDER_MODE=ratio|mcap`. Default mcap ladder = `10000:50:5000,60000:50:0,300000:100:0` (50% at $10k with $5k trail, 50% of remainder at $60k grad no-floor moonbag, 100% at $300k).
+  - Entry mcap gate (`PUMPFUN_ENTRY_MCAP_MAX_USD`, default $5k). Absolute mcap rug stop (`PUMPFUN_RUG_STOP_MCAP_USD`, default $1300). Fee-economic skip (`PUMPFUN_MIN_SELL_USD`, default $0.20) — silent milestone advance.
+  - SOL/USD cache 30s TTL via Jupiter SOL→USDC. Supply pinned at buy so entry-gate + monitor use same denominator.
+  - `floor_after=0` in ladder = no trailing floor (moonbag).
+  - `tx_landings.py` shared LandingTracker — records every submit/land per module (pumpfun_autobuy / graduation_buy / graduation_sell) with latency + rate. Endpoint `GET /api/live/tx_landings`. Correctly distinguishes `failed` (RPC error / revert) vs `timed_out` (never confirmed).
+  - 489/489 tests passing (iteration_18). Zero criticals.
+
 - ✅ **[2026-02] Laddered moonbag exit with ratcheting trailing floor** — shared exit-ladder state machine (`exit_ladder.py`) applied to BOTH pump.fun bonding-curve sniper AND graduation sniper:
   - Default ladder: 5x→80%→floor5x, 20x→50%→floor10x, 100x→100%→floor50x (user's requested 10x gap after 20x milestone).
   - Rug stop at 0.5x before any milestone hit (hard emergency exit).
