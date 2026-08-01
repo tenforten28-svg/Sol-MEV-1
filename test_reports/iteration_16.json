@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 16: tested the new graduation snipe system (graduation_monitor.py, graduation_executor.py, 5 new endpoints, /api/live/emergency_stop kill switch, GraduationPanel.jsx). Created /app/backend/tests/test_graduation_it16.py: 28/28 passed — module constants, monitor disabled-start no-op + status shape, 8 executor fail-closed safety gates (exec disabled, live_trader not ready, low_liquidity, daily budget, max_concurrent, cooldown, per-source disable, status defaults) with live_trader.execute_swap and jupiter.get_quote booby-trapped to raise AssertionError (never invoked; buys_fired stayed 0 in every case), all 5 graduation endpoints incl. source filter + replay invalid sig/source, emergency_stop kill switch (verified executor.enabled=false and pumpfun autobuy enabled=false afterwards), and a 10-endpoint regression sweep (all 200). Frontend: Dashboard loads, graduation-panel visible, Monitor: OFF / Executor: SAFE badges, all 6 stat tiles, both empty-state lists, pumpfun-panel + live-trading-panel regression OK, 0 console errors, Emergency Stop button click -> 200 + 'stopped: live_trader, pumpfun_autobuy, graduation_executor' message. No live gates were enabled at any point.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "graduation_executor.on_event", "issue": "No concurrency guard: max_concurrent / cooldown / daily-budget are all checked BEFORE `await asyncio.sleep(settle_delay_sec)` and last_buy_at/day_spent_sol are only mutated AFTER execute_swap. Two graduations detected in the same ~3s window (monitor dispatches each via asyncio.create_task) can both pass the gates and both buy, exceeding max_concurrent and the daily budget. Suggest reserving a slot + budget (or an asyncio.Lock) before the settle sleep."},
+      {"endpoint": "graduation_executor.on_event", "issue": "cfg.enabled is not re-checked after the settle delay, so POST /api/live/emergency_stop fired during the 3s settle window will not stop an in-flight buy. Add a post-sleep `if not self.cfg.enabled: return` guard."},
+      {"endpoint": "graduation_executor.on_event", "issue": "reserves_sol liquidity filter uses the detection-time snapshot only; no re-read after the 3s settle, so a pool drained during settle still gets bought."},
+      {"endpoint": "/api/live/emergency_stop", "issue": "Kill switch flips config flags only; it does not cancel the graduation monitor WSS tasks, the position loop, or force-close open graduation positions. Also unauthenticated (acknowledged fast-path choice) — add a shared-secret header before public exposure."},
+      {"endpoint": "graduation_executor", "issue": "rejects_filter is incremented only for the low_liquidity branch; gate rejects (cooldown/budget/max_concurrent) are invisible in counters, making dashboard triage harder."},
+      {"endpoint": "graduation_executor", "issue": "Graduation buys skip the pump.fun anti-rug suite (mint/freeze authority, dev-hold, holder concentration) that pumpfun_autobuy enforces; only live_trader's generic gates apply. Confirm this is intentional for post-graduation mints."},
+      {"endpoint": "/api/live/graduation/{status,events,positions}", "issue": "Errors are swallowed into 200 responses with an `error` key instead of 5xx; acceptable for dashboard use but hides failures from monitoring."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_graduation_it16.py",
+    "/app/test_reports/pytest/it16_graduation.xml"
+  ],
+  "action_items": [
+    "Add a concurrency/budget reservation (asyncio.Lock or pre-reserve slot+budget) before the settle-delay sleep in graduation_executor.on_event",
+    "Re-check cfg.enabled (and optionally re-check pool liquidity) after the settle delay so emergency_stop is honored mid-flight",
+    "Optionally make emergency_stop also cancel monitor/position tasks and count non-liquidity rejects"
+  ],
+  "critical_code_review_comments": [
+    "graduation_executor.on_event: gates evaluated pre-sleep + counters mutated post-swap = TOCTOU window on real money; guard with a lock and reserve day_spent_sol/positions slot before awaiting the settle delay.",
+    "graduation_monitor dispatches on_event via asyncio.create_task with no bounded concurrency, which is what makes the above race reachable."
+  ],
+  "updated_files": ["/app/backend/tests/test_graduation_it16.py"],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "100%"},
+  "seed_data_creation": "None persisted — executor gate tests used in-memory fake DB collections; no MongoDB writes.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run graduation tests with: cd /app/backend && python -m pytest tests/test_graduation_it16.py -p no:anchorpy -v. Executor gate tests build isolated GraduationExecutor instances with a stub live_trader (execute_swap raises AssertionError) and patch ge_mod.asyncio.sleep, so no live gates or 3s waits. NEVER set GRADUATION_ENABLED/GRADUATION_EXEC_ENABLED/LIVE_TRADING_ENABLED. Note POST /api/live/emergency_stop mutates in-process config (live_trader.simulation_mode=True) and persists until backend restart. Un-fixed: on_event TOCTOU race across the settle delay (see backend_issues.minor).",
+  "rca_of_the_issue": "No functional defects found. Only latent risk: graduation_executor.on_event performs all budget/concurrency/cooldown checks before `await asyncio.sleep(settle_delay_sec)` while last_buy_at and day_spent_sol are updated only after execute_swap, so concurrent graduation events dispatched by the monitor can each pass the gates and double-spend."
+}

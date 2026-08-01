@@ -128,6 +128,19 @@ async def lifespan(app: FastAPI):
         logger.info("💊 Pump.fun auto-buyer initialized (enable with PUMPFUN_AUTO_BUY_ENABLED=true)")
     except Exception as e:
         logger.exception(f"Failed to start pump.fun autobuyer: {e}")
+
+    # Start GRADUATION MONITOR (PumpSwap + Bonk.fun/LaunchLab) + executor
+    # Gated by GRADUATION_ENABLED. Executor gated by GRADUATION_EXEC_ENABLED (fade-the-dump strategy).
+    try:
+        from graduation_monitor import get_graduation_monitor
+        from graduation_executor import get_graduation_executor
+        grad_exec = get_graduation_executor(db)
+        grad_mon = get_graduation_monitor(db, on_event=grad_exec.on_event)
+        await grad_mon.start()
+        await grad_exec.start_monitor()
+        logger.info("🎓 Graduation monitor initialized (enable with GRADUATION_ENABLED=true; exec: GRADUATION_EXEC_ENABLED=true)")
+    except Exception as e:
+        logger.exception(f"Failed to start graduation monitor: {e}")
     
     logger.info("🚀 Solana MEV Arbitrage Bot started")
     logger.info("⚡ Flash Loan Monitor enabled")
@@ -399,6 +412,108 @@ async def pumpfun_positions(limit: int = 50):
         return {"count": len(docs), "events": docs}
     except Exception as e:
         return {"count": 0, "events": [], "error": str(e)}
+
+
+@api_router.get("/live/graduation/status")
+async def graduation_status():
+    """Combined status of graduation monitor + executor."""
+    try:
+        from graduation_monitor import get_graduation_monitor
+        from graduation_executor import get_graduation_executor
+        gm = get_graduation_monitor(db)
+        ge = get_graduation_executor(db)
+        return {"monitor": gm.status(), "executor": ge.status()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@api_router.get("/live/graduation/events")
+async def graduation_events(limit: int = 20, source: Optional[str] = None):
+    """Recent normalized graduation events from both platforms."""
+    try:
+        q = {"source": source} if source else {}
+        cursor = db.graduation_events.find(q).sort("detected_at", -1).limit(limit)
+        docs = []
+        async for d in cursor:
+            d.pop("_id", None)
+            docs.append(d)
+        return {"count": len(docs), "events": docs}
+    except Exception as e:
+        return {"count": 0, "events": [], "error": str(e)}
+
+
+@api_router.get("/live/graduation/positions")
+async def graduation_positions(limit: int = 30):
+    """Open/close/reject events for graduation-snipe positions."""
+    try:
+        cursor = db.graduation_positions.find({}).sort("at", -1).limit(limit)
+        docs = []
+        async for d in cursor:
+            d.pop("_id", None)
+            docs.append(d)
+        return {"count": len(docs), "events": docs}
+    except Exception as e:
+        return {"count": 0, "events": [], "error": str(e)}
+
+
+@api_router.post("/live/graduation/replay")
+async def graduation_replay(signature: str, source: str = "pumpswap"):
+    """Backtest helper: given a historical graduation signature, run it through
+    the monitor's extraction path and return what the normalized event would be.
+    Does NOT execute a trade."""
+    if source not in ("pumpswap", "bonk_cpmm"):
+        return {"error": "source must be 'pumpswap' or 'bonk_cpmm'"}
+    try:
+        from graduation_monitor import get_graduation_monitor
+        gm = get_graduation_monitor(db)
+        detail = await gm._extract_pool_details(signature, source)
+        if not detail:
+            return {"ok": False, "reason": "tx not found or could not parse"}
+        return {
+            "ok": True,
+            "source": source,
+            "signature": signature,
+            "mint": detail["mint"],
+            "pool_address": detail["pool_address"],
+            "reserves_sol": detail["reserves_sol"],
+            "block_time_iso": detail.get("block_time_iso"),
+            "latency_ms_from_block": detail.get("latency_ms"),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@api_router.post("/live/emergency_stop")
+async def emergency_stop():
+    """Kill switch — flips every live gate in-process. Redeploy or restart to
+    re-enable. Unauthenticated per fast-path; add shared-secret header before
+    exposing on a public Railway URL for real."""
+    from live_trader import get_live_trader
+    from pumpfun_autobuy import get_pumpfun_autobuyer
+    from graduation_executor import get_graduation_executor
+    stopped = []
+    try:
+        lt = get_live_trader()
+        lt.cfg.live_enabled = False
+        lt.cfg.simulation_mode = True
+        stopped.append("live_trader")
+    except Exception as e:
+        stopped.append(f"live_trader FAIL: {e}")
+    try:
+        ab = get_pumpfun_autobuyer(db)
+        ab.cfg.enabled = False
+        stopped.append("pumpfun_autobuy")
+    except Exception as e:
+        stopped.append(f"pumpfun_autobuy FAIL: {e}")
+    try:
+        ge = get_graduation_executor(db)
+        ge.cfg.enabled = False
+        stopped.append("graduation_executor")
+    except Exception as e:
+        stopped.append(f"graduation_executor FAIL: {e}")
+    return {"ok": True, "stopped": stopped, "note": "in-process only — Railway env vars are unchanged; restart re-reads them"}
+
+
 
 
 @api_router.get("/bot_diagnostic")
