@@ -219,13 +219,23 @@ class GraduationExecutor:
             return {"ok": False, "reason": self.last_reason}
 
         # Fire buy via Jupiter
+        from tx_landings import get_tracker
+        tracker = get_tracker(self.db)
         amount_lamports = int(self.cfg.buy_sol * LAMPORTS_PER_SOL)
         prev_slip = self.lt.cfg.slippage_bps
         self.lt.cfg.slippage_bps = self.cfg.slippage_bps
+        submitted_at = time.time()
         try:
             result = await self.lt.execute_swap(SOL_MINT, mint, amount_lamports)
         finally:
             self.lt.cfg.slippage_bps = prev_slip
+
+        landed_at = time.time() if result.get("success") else None
+        await tracker.record(
+            "graduation_buy", result.get("signature"), submitted_at, landed_at,
+            bool(result.get("success")), result.get("error"),
+            extra={"mint": mint, "source": source, "reserves_sol": reserves},
+        )
 
         self.buys_fired += 1
 
@@ -351,12 +361,22 @@ class GraduationExecutor:
             return
 
         logger.info(f"[grad-sell] {mint[:6]} {reason} sell_pct={sell_pct:.1f}% ratio={ratio}")
+        from tx_landings import get_tracker
+        tracker = get_tracker(self.db)
         prev_slip = self.lt.cfg.slippage_bps
         self.lt.cfg.slippage_bps = self.cfg.slippage_bps
+        submitted_at = time.time()
         try:
             result = await self.lt.execute_swap(mint, SOL_MINT, tokens_to_sell)
         finally:
             self.lt.cfg.slippage_bps = prev_slip
+
+        landed_at = time.time() if result.get("success") else None
+        await tracker.record(
+            "graduation_sell", result.get("signature"), submitted_at, landed_at,
+            bool(result.get("success")), result.get("error"),
+            extra={"mint": mint, "sell_pct": sell_pct, "reason": reason},
+        )
 
         self.sells_fired += 1
         sol_received = 0.0

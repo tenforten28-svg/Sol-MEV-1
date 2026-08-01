@@ -483,6 +483,19 @@ async def graduation_replay(signature: str, source: str = "pumpswap"):
         return {"ok": False, "error": str(e)}
 
 
+@api_router.get("/live/tx_landings")
+async def tx_landings_status():
+    """Landing-rate metrics per module (pumpfun_autobuy, graduation_buy, graduation_sell).
+    Free diagnostic — helps you decide whether to invest in Yellowstone / SWQoS / Jito
+    later based on REAL landing rates instead of assumptions."""
+    try:
+        from tx_landings import get_tracker
+        return get_tracker(db).status()
+    except Exception as e:
+        return {"error": str(e), "modules": {}}
+
+
+
 @api_router.post("/live/emergency_stop")
 async def emergency_stop():
     """Kill switch — flips every live gate in-process. Redeploy or restart to

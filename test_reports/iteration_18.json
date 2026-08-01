@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 18 testing of mcap-mode scaled exit ladder + tx landing metrics. Created /app/backend/tests/test_mcap_ladder_it18.py (43 new tests) covering exit_ladder floor_after==0, LandingTracker unit behavior, _get_sol_usd 30s cache TTL, _current_mcap_usd math/None-on-failure, entry-mcap gate (too_high / unverifiable / exception fail-closed / pass / ratio-mode skip), mcap-vs-ratio dispatch, absolute-USD rug stop, time_limit_no_mcap, fee-check silent milestone advance, _sign_and_send tracker instrumentation (landed + rpc-error), graduation module names, and API assertions for /api/live/pumpfun/autobuy_status new keys, NEW /api/live/tx_landings, POST /api/live/emergency_stop (200) plus a 12-endpoint regression sweep. Full backend suite (excluding env-specific test_live_rpc_ping.py): 489/489 passing. Frontend: PumpfunPanel verified in ratio mode against the live API and in mcap mode + null ladder_mcap via route interception — both JSX branches render correctly, no console/page errors, other panels unaffected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "pumpfun_autobuy._sign_and_send / tx_landings.record", "issue": "Explicit RPC submit errors (data['error'] path) are recorded with landed_at=None and success=False, so LandingTracker classifies them as 'timed_out' instead of 'failed'. Verified by test: submits=1, failed=0, timed_out=1 for a 'blockhash not found' RPC error. Landing-rate diagnostics will over-report timeouts."},
+      {"endpoint": "pumpfun_autobuy._evaluate_position (mcap fee-check)", "issue": "Uses the raw global _sol_usd_cache['price'] with a hardcoded 150.0 fallback instead of awaiting _get_sol_usd(); if the cache was never warmed the fee gate is computed against a fabricated SOL price."},
+      {"endpoint": "pumpfun_autobuy._evaluate_position (mcap)", "issue": "_current_mcap_usd(pos.mint) is called without supply_raw_hint (defaults to 1e15) while the entry gate passes the real on-chain supply. For any non-standard supply the entry mcap and the monitoring mcap use different denominators, distorting milestone/rug-stop comparisons."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PumpfunPanel config strip (mcap mode)", "issues": ["Missing values render as '$—' (dollar sign glued to em-dash) for Rug stop / Entry max / Min sell — cosmetic; prefer plain '—' when the value is null"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_mcap_ladder_it18.py",
+    "/app/test_reports/pytest/pytest_results_it18.xml"
+  ],
+  "action_items": [
+    "DECIDE + FIX: default mcap ladder '10000:50:5000,60000:50:0,300000:100:0' does NOT produce a 'no floor / moonbag' stage after $60k. record_milestone_hit only ratchets the floor UP (m.floor_after > current_floor), so after milestone 0 sets floor=$5000, milestone 1's floor_after=0 is ignored and the $5,000 trailing floor stays armed — a drop from $60k to $4k fires trailing_floor SELL_ALL. This contradicts the stated intent ('no floor after — moonbag'). Either allow an explicit 0 to clear the floor (sentinel, e.g. -1 or None) or change the documented default.",
+    "Fix tx_landings classification so explicit submit errors increment 'failed' rather than 'timed_out'",
+    "Use await self._get_sol_usd() (not the raw cache with a 150.0 fallback) in the mcap fee-economic gate",
+    "Pass supply_raw_hint consistently to _current_mcap_usd in _evaluate_position (store supply on Position at buy time)",
+    "Remove dead code: approx_position_value_usd (pumpfun_autobuy.py line ~883) is computed and never used, and its trailing `* (pos.buy_sol / max(pos.buy_sol, 1e-9))` factor is a no-op",
+    "DRY: the fee-check skip path re-implements record_milestone_hit inline (lines ~893-897); call exit_ladder.record_milestone_hit instead so ratchet semantics never diverge"
+  ],
+  "critical_code_review_comments": [
+    "exit_ladder.record_milestone_hit cannot express 'remove the trailing floor' — floor_after=0 is silently dropped whenever a previous milestone set a positive floor. This is the single functional gap between the code and the Doc-1 mcap ladder spec.",
+    "pumpfun_autobuy.py is 1085 lines and now carries safety filters, RPC readers, pricing, ladder dispatch and execution; split into pumpfun_safety.py / pumpfun_pricing.py / pumpfun_exec.py.",
+    "get_tracker() is a module-global singleton bound to the first db passed; acceptable in-process, but status() counters reset on restart — the UI/endpoint should state that or aggregate from db.tx_landings.",
+    "The mcap fee-check only applies when pos.entry_mcap_usd > 0; if the entry mcap capture failed post-buy, dust partial sells are no longer suppressed."
+  ],
+  "updated_files": ["/app/backend/tests/test_mcap_ladder_it18.py"],
+  "success_rate": {"backend": "100% (489/489 excluding test_live_rpc_ping.py)", "frontend": "100% (ratio branch, mcap branch, null-safety, no regressions)"},
+  "seed_data_creation": "None — all external I/O (RPC, PumpPortal, Jupiter, Mongo) patched with fakes; no live flags enabled; DB untouched",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New file /app/backend/tests/test_mcap_ladder_it18.py is the it18 regression suite (43 tests). Run with `cd /app/backend && python -m pytest tests/ -p no:anchorpy -q --ignore=tests/test_live_rpc_ping.py` (489 passing). Note: /api/live/pumpfun/autobuy_status returns a FLAT object (no 'autobuy' wrapper) — PumpfunPanel consumes ab.data directly, so playwright route mocks must fulfill flat JSON. test_ratchet_keeps_prior_floor_when_next_is_zero deliberately asserts the CURRENT (spec-divergent) ratchet behavior — if the main agent changes floor-clearing semantics, that test must be updated.",
+  "rca_of_the_issue": "Moonbag gap RCA: evaluate_ladder correctly skips the trailing-floor check when current_floor==0, but record_milestone_hit's ratchet guard `if state.current_floor is None or m.floor_after > state.current_floor` means a 0 can never overwrite an existing positive floor. With the default mcap ladder the $5,000 floor set at the $10k milestone persists through the $60k stage, so the intended un-floored moonbag ride to $300k is protected by a $5k trailing stop instead. Reproduce: record_milestone_hit(st, ms, 0); record_milestone_hit(st, ms, 1); evaluate_ladder(60000,...); evaluate_ladder(4000,...) -> SELL_ALL trailing_floor."
+}

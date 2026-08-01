@@ -512,7 +512,9 @@ class TestApiLadderShape:
         body = r.json()
         node = body.get("autobuy") or body
         assert node.get("tp_sl_enforced") is True, node.get("tp_sl_enforced")
-        assert "laddered exits" in (node.get("exit_policy") or "")
+        # New dual-mode: exit_policy string is prefixed with '[ratio]' or '[mcap]'
+        ep = node.get("exit_policy") or ""
+        assert ("ratio ladder" in ep) or ("mcap ladder" in ep), ep
         assert node.get("rug_stop_mult") == 0.5
         ladder = node.get("ladder")
         assert isinstance(ladder, list) and len(ladder) == 3

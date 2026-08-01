@@ -50,6 +50,11 @@ logger = logging.getLogger("pumpfun_autobuy")
 
 PUMPPORTAL_TRADE_LOCAL_URL = "https://pumpportal.fun/api/trade-local"
 LAMPORTS_PER_SOL = 1_000_000_000
+USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+SOL_MINT = "So11111111111111111111111111111111111111112"
+
+# Shared SOL/USD price cache (30s TTL). Populated via Jupiter SOL→USDC quote.
+_sol_usd_cache = {"price": None, "at": 0.0}
 
 # Pump.fun on-chain constants
 PUMPFUN_PROGRAM_ID = Pubkey.from_string("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
@@ -125,12 +130,29 @@ class AutoBuyConfig:
         self.ladder_cfg = os.environ.get("PUMPFUN_LADDER", DEFAULT_LADDER_CFG).strip()
         self.rug_stop_mult = _fflt("PUMPFUN_RUG_STOP", DEFAULT_RUG_STOP)
         self.ladder = parse_ladder(self.ladder_cfg)
+        # Ladder mode: 'ratio' (multiples of entry price, existing default) OR
+        # 'mcap' (absolute USD market cap thresholds, per Doc 1 scaled-exit spec)
+        self.ladder_mode = os.environ.get("PUMPFUN_LADDER_MODE", "ratio").strip().lower()
+        # Mcap-mode configuration (only used when ladder_mode == 'mcap')
+        # Default ladder matches Doc 1: sell 50% at $10k (trail $5k), 50% remainder at $60k
+        # (graduation, no floor after), moonbag exit at $300k (5x graduation mcap, no floor).
+        self.ladder_mcap_cfg = os.environ.get(
+            "PUMPFUN_LADDER_MCAP", "10000:50:5000,60000:50:0,300000:100:0"
+        ).strip()
+        self.ladder_mcap = parse_ladder(self.ladder_mcap_cfg)
+        # Absolute USD mcap under which the position is force-closed BEFORE any milestone hit
+        self.rug_stop_mcap_usd = _fflt("PUMPFUN_RUG_STOP_MCAP_USD", 1300.0)
+        # Entry gate: skip buy if detected mcap is above this (avoid chasing pumps)
+        self.entry_mcap_max_usd = _fflt("PUMPFUN_ENTRY_MCAP_MAX_USD", 5000.0)
+        # Fee-economic gate: skip a partial sell if the sale value < this USD (fees eat gains)
+        self.min_sell_usd = _fflt("PUMPFUN_MIN_SELL_USD", 0.20)
 
 
 class Position:
     def __init__(self, mint: str, buy_sol: float, token_amount: float,
                  buy_signature: str, opened_at: float,
-                 entry_price: float = 0.0):
+                 entry_price: float = 0.0,
+                 entry_mcap_usd: float = 0.0):
         self.mint = mint
         self.buy_sol = buy_sol          # SOL spent
         self.token_amount = token_amount  # tokens received (whole units)
@@ -138,7 +160,8 @@ class Position:
         self.opened_at = opened_at
         self.closed = False
         # Ladder-exit state
-        self.entry_price = entry_price   # SOL per token (from bonding curve at buy time)
+        self.entry_price = entry_price   # SOL per raw token unit (from bonding curve at buy time)
+        self.entry_mcap_usd = entry_mcap_usd
         self.remaining_pct_of_original = 100.0
         self.ladder_state = LadderState()
         self.partial_sells: list = []
@@ -445,7 +468,11 @@ class PumpFunAutoBuyer:
             return await r.read()
 
     async def _sign_and_send(self, tx_bytes: bytes) -> Dict[str, Any]:
-        """Sign the pumpportal-built tx with our local wallet, submit via QuickNode."""
+        """Sign the pumpportal-built tx with our local wallet, submit via QuickNode.
+        Records submit/landing metrics via tx_landings for landing-rate analysis."""
+        from tx_landings import get_tracker
+        tracker = get_tracker(self.db)
+
         unsigned = VersionedTransaction.from_bytes(tx_bytes)
         signed = VersionedTransaction(unsigned.message, [self.lt.wallet])
         signed_bytes = bytes(signed)
@@ -457,16 +484,19 @@ class PumpFunAutoBuyer:
             "params": [base64.b64encode(signed_bytes).decode(),
                        {"encoding": "base64", "skipPreflight": False, "maxRetries": 3}],
         }
+        submitted_at = time.time()
         s = await self._http()
         async with s.post(self.lt.cfg.rpc_url, json=payload, timeout=20) as r:
             data = await r.json()
         if "error" in data:
+            await tracker.record("pumpfun_autobuy", sig, submitted_at, None, False, str(data["error"]))
             return {"success": False, "error": str(data["error"]), "signature": sig}
 
         # Poll confirmation (up to 60s)
         deadline = time.time() + 60
         confirmed = False
         err = None
+        landed_at = None
         while time.time() < deadline:
             await asyncio.sleep(2)
             try:
@@ -481,9 +511,11 @@ class PumpFunAutoBuyer:
                         break
                     if v.get("confirmationStatus") in ("confirmed", "finalized"):
                         confirmed = True
+                        landed_at = time.time()
                         break
             except Exception:
                 pass
+        await tracker.record("pumpfun_autobuy", sig, submitted_at, landed_at, confirmed, err)
         return {"success": confirmed, "signature": sig, "error": err}
 
     # -------- main buy path (called by sniper on detection) --------
@@ -599,6 +631,24 @@ class PumpFunAutoBuyer:
                 await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev, "curve": curve, "holders": holders})
                 return {"ok": False, "reason": self.last_reason, "holders": holders}
 
+        # Entry-mcap window gate (mcap mode only) — refuse to buy above ceiling
+        entry_mcap_usd = 0.0
+        if self.cfg.ladder_mode == "mcap":
+            try:
+                entry_mcap_usd = await self._current_mcap_usd(mint, supply_raw_hint=int(safety.get("supply") or 0)) or 0.0
+            except Exception:
+                entry_mcap_usd = 0.0
+            if entry_mcap_usd <= 0:
+                self.rejects_safety += 1
+                self.last_reason = "entry_mcap_unverifiable"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety})
+                return {"ok": False, "reason": self.last_reason}
+            if entry_mcap_usd > self.cfg.entry_mcap_max_usd:
+                self.rejects_safety += 1
+                self.last_reason = f"entry_mcap_too_high: ${entry_mcap_usd:.0f} > ${self.cfg.entry_mcap_max_usd:.0f}"
+                await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "entry_mcap_usd": entry_mcap_usd})
+                return {"ok": False, "reason": self.last_reason}
+
         # Build tx via pumpportal
         try:
             tx_bytes = await self._pumpportal_build_tx("buy", mint, self.cfg.buy_sol, denominated_in_sol=True)
@@ -622,7 +672,7 @@ class PumpFunAutoBuyer:
             })
             return {"ok": False, "reason": f"buy tx failed: {result.get('error')}", "signature": result.get("signature")}
 
-        # Position opened. Capture entry price from bonding curve NOW (right after buy)
+        # Position opened. Capture entry price + mcap from bonding curve NOW (right after buy)
         # so the ladder has a reference. Slight over-estimate of fill price (curve moved by
         # our own buy) but close enough for milestone multipliers.
         entry_price = 0.0
@@ -636,6 +686,14 @@ class PumpFunAutoBuyer:
         except Exception:
             pass
 
+        # If mcap mode, capture post-buy mcap too (or reuse gate's pre-buy value)
+        pos_entry_mcap_usd = entry_mcap_usd if self.cfg.ladder_mode == "mcap" else 0.0
+        if self.cfg.ladder_mode == "mcap" and pos_entry_mcap_usd == 0:
+            try:
+                pos_entry_mcap_usd = await self._current_mcap_usd(mint, supply_raw_hint=int(safety.get("supply") or 0)) or 0.0
+            except Exception:
+                pos_entry_mcap_usd = 0.0
+
         pos = Position(
             mint=mint,
             buy_sol=self.cfg.buy_sol,
@@ -643,6 +701,7 @@ class PumpFunAutoBuyer:
             buy_signature=result["signature"],
             opened_at=time.time(),
             entry_price=entry_price,
+            entry_mcap_usd=pos_entry_mcap_usd,
         )
         self.positions[mint] = pos
         self.buys_successful += 1
@@ -656,6 +715,8 @@ class PumpFunAutoBuyer:
             "dev": dev,
             "curve": curve,
             "holders": holders,
+            "ladder_mode": self.cfg.ladder_mode,
+            "entry_mcap_usd": pos_entry_mcap_usd,
         })
         return {"ok": True, "signature": result["signature"], "mint": mint}
 
@@ -677,6 +738,41 @@ class PumpFunAutoBuyer:
                 break
             except Exception as e:
                 logger.warning(f"[pumpfun-monitor] loop error: {e}")
+
+    async def _get_sol_usd(self) -> float:
+        """Return SOL/USD spot price, cached 30s. Uses Jupiter SOL→USDC quote."""
+        now = time.time()
+        cached_price = _sol_usd_cache["price"]
+        if cached_price and (now - _sol_usd_cache["at"]) < 30:
+            return cached_price
+        try:
+            q = await self.lt.jupiter.get_quote(SOL_MINT, USDC_MINT, LAMPORTS_PER_SOL, 500)
+            usdc_out = int(q.get("outAmount") or 0) / 1_000_000  # USDC has 6 decimals
+            if usdc_out > 0:
+                _sol_usd_cache["price"] = usdc_out
+                _sol_usd_cache["at"] = now
+                return usdc_out
+        except Exception:
+            pass
+        return cached_price or 150.0    # fallback if all price sources fail
+
+    async def _current_mcap_usd(self, mint: str, supply_raw_hint: int = 0) -> Optional[float]:
+        """Fully-diluted market cap in USD from bonding-curve state × SOL/USD price."""
+        curve = await self._check_curve_state_full(mint)
+        if not curve.get("ok"):
+            return None
+        vsr = curve.get("virtual_sol_reserves") or 0
+        vtr = curve.get("virtual_token_reserves") or 0
+        if not vsr or not vtr:
+            return None
+        # pump.fun tokens use 6 decimals and standard 1B supply.
+        # If caller passed the exact supply from getAccountInfo, prefer that; else 1e15 raw.
+        supply_raw = supply_raw_hint or int(1e15)
+        # mcap in lamports = price_per_raw × supply_raw = (vsr / vtr) × supply_raw
+        mcap_lamports = (vsr / vtr) * supply_raw
+        mcap_sol = mcap_lamports / LAMPORTS_PER_SOL
+        sol_usd = await self._get_sol_usd()
+        return mcap_sol * sol_usd
 
     async def _current_curve_price(self, mint: str) -> Optional[float]:
         """Live bonding-curve price in SOL per raw token unit.
@@ -727,49 +823,87 @@ class PumpFunAutoBuyer:
             return {"ok": False, "reason": f"read: {e}"}
 
     async def _evaluate_position(self, pos: Position) -> Optional[Dict[str, Any]]:
-        """Return {action, sell_pct, reason, ratio, milestone_index} or None."""
+        """Return {action, sell_pct, reason, ratio, milestone_index, mode} or None.
+        Dispatches between ratio-mode and mcap-mode based on self.cfg.ladder_mode."""
         age = time.time() - pos.opened_at
         hold_expired = age >= self.cfg.hold_max_seconds
+        mode = self.cfg.ladder_mode
 
-        # Lazily recover entry_price if the buy-time curve read failed.
-        # Without entry_price the ladder + rug_stop have no reference — a position
-        # with entry_price==0 would be unprotected. Try to backfill from the current
-        # curve state (over-estimate, but better than no protection).
-        if not pos.entry_price:
-            price = await self._current_curve_price(pos.mint)
-            if price:
-                pos.entry_price = price
-                logger.info(f"[pumpfun-eval] lazy entry_price backfill for {pos.mint[:8]}: {price:g}")
+        if mode == "mcap":
+            # Absolute USD mcap thresholds; state machine treats them as generic signal values
+            signal = await self._current_mcap_usd(pos.mint)
+            if signal is None:
+                if hold_expired:
+                    return {"action": "sell_all", "sell_pct": 100.0,
+                            "reason": "time_limit_no_mcap", "ratio": None,
+                            "milestone_index": None, "mode": "mcap"}
+                return None
+            action = evaluate_ladder(
+                ratio=signal,
+                milestones=self.cfg.ladder_mcap,
+                state=pos.ladder_state,
+                rug_stop_mult=self.cfg.rug_stop_mcap_usd,
+                hold_expired=hold_expired,
+            )
+            signal_display = signal
+        else:
+            # ratio mode (existing behavior)
+            # Lazily recover entry_price if the buy-time curve read failed
+            if not pos.entry_price:
+                price = await self._current_curve_price(pos.mint)
+                if price:
+                    pos.entry_price = price
+                    logger.info(f"[pumpfun-eval] lazy entry_price backfill for {pos.mint[:8]}: {price:g}")
+            ratio = None
+            if pos.entry_price and pos.entry_price > 0:
+                current_price = await self._current_curve_price(pos.mint)
+                if current_price is not None:
+                    ratio = current_price / pos.entry_price
+            if ratio is None:
+                if hold_expired:
+                    return {"action": "sell_all", "sell_pct": 100.0,
+                            "reason": "time_limit_no_quote", "ratio": None,
+                            "milestone_index": None, "mode": "ratio"}
+                return None
+            action = evaluate_ladder(
+                ratio=ratio,
+                milestones=self.cfg.ladder,
+                state=pos.ladder_state,
+                rug_stop_mult=self.cfg.rug_stop_mult,
+                hold_expired=hold_expired,
+            )
+            signal_display = ratio
 
-        ratio = None
-        if pos.entry_price and pos.entry_price > 0:
-            current_price = await self._current_curve_price(pos.mint)
-            if current_price is not None:
-                ratio = current_price / pos.entry_price
-
-        # If we can't quote and time is up, fall back to time_limit exit
-        if ratio is None:
-            if hold_expired:
-                return {"action": "sell_all", "sell_pct": 100.0,
-                        "reason": "time_limit_no_quote", "ratio": None,
-                        "milestone_index": None}
-            return None
-
-        action = evaluate_ladder(
-            ratio=ratio,
-            milestones=self.cfg.ladder,
-            state=pos.ladder_state,
-            rug_stop_mult=self.cfg.rug_stop_mult,
-            hold_expired=hold_expired,
-        )
         if action.type == LadderActionType.HOLD:
             return None
+
+        # Fee-economic gate on partial sells (mcap mode only, where signal is USD).
+        # Skip a partial sell that would net less than min_sell_usd worth after fees.
+        if mode == "mcap" and action.type == LadderActionType.SELL_PARTIAL:
+            approx_position_value_usd = signal_display * (pos.remaining_pct_of_original / 100.0) * (pos.buy_sol / max(pos.buy_sol, 1e-9))
+            # Rough: partial sell value = current mcap fraction * sell_pct * position share.
+            # More useful: buy_sol × (signal / entry_mcap) × sell_pct / 100 × sol_usd
+            sol_usd = _sol_usd_cache["price"] or 150.0
+            if pos.entry_mcap_usd > 0:
+                ratio_from_entry = signal_display / pos.entry_mcap_usd
+                partial_value_usd = pos.buy_sol * sol_usd * ratio_from_entry * (action.sell_pct / 100.0) * (pos.remaining_pct_of_original / 100.0)
+                if partial_value_usd < self.cfg.min_sell_usd:
+                    logger.info(f"[pumpfun-eval] skipping {action.reason}: partial value ${partial_value_usd:.3f} < min ${self.cfg.min_sell_usd}")
+                    # Mark milestone as consumed WITHOUT selling — advance so ladder progresses
+                    if action.milestone_index is not None:
+                        pos.ladder_state.milestones_hit.append(action.milestone_index)
+                        m = self.cfg.ladder_mcap[action.milestone_index]
+                        if pos.ladder_state.current_floor is None or m.floor_after > pos.ladder_state.current_floor:
+                            pos.ladder_state.current_floor = m.floor_after
+                    return None
+
         return {
             "action": "sell_all" if action.type == LadderActionType.SELL_ALL else "sell_partial",
             "sell_pct": action.sell_pct,
             "reason": action.reason,
-            "ratio": ratio,
+            "ratio": signal_display,
             "milestone_index": action.milestone_index,
+            "mode": mode,
         }
 
     async def _sell(self, mint: str, decision: Dict[str, Any]):
@@ -916,12 +1050,25 @@ class PumpFunAutoBuyer:
             "live_trader_ready": self.lt.ready,
             "execution_backend": "pumpportal_local_tx + quicknode_rpc",
             "tp_sl_enforced": True,
-            "exit_policy": f"laddered exits via bonding-curve price feed. ladder={self.cfg.ladder_cfg}, rug_stop={self.cfg.rug_stop_mult}x",
+            "ladder_mode": self.cfg.ladder_mode,
+            "exit_policy": (
+                f"[{self.cfg.ladder_mode}] "
+                + (f"mcap ladder={self.cfg.ladder_mcap_cfg}, rug_stop_mcap_usd=${self.cfg.rug_stop_mcap_usd}, entry_mcap_max=${self.cfg.entry_mcap_max_usd}, min_sell=${self.cfg.min_sell_usd}"
+                   if self.cfg.ladder_mode == "mcap"
+                   else f"ratio ladder={self.cfg.ladder_cfg}, rug_stop={self.cfg.rug_stop_mult}x")
+            ),
             "ladder": [
                 {"mult": m.mult, "sell_pct": m.sell_pct_of_remaining, "floor_after": m.floor_after}
                 for m in self.cfg.ladder
             ],
+            "ladder_mcap": [
+                {"mcap_usd": m.mult, "sell_pct": m.sell_pct_of_remaining, "floor_after_usd": m.floor_after}
+                for m in self.cfg.ladder_mcap
+            ],
             "rug_stop_mult": self.cfg.rug_stop_mult,
+            "rug_stop_mcap_usd": self.cfg.rug_stop_mcap_usd,
+            "entry_mcap_max_usd": self.cfg.entry_mcap_max_usd,
+            "min_sell_usd": self.cfg.min_sell_usd,
         }
 
 

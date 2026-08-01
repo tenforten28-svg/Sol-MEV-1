@@ -52,7 +52,8 @@ class LadderState:
 
 def parse_ladder(cfg_str: str) -> List[Milestone]:
     """Parse '5:80:5,20:50:10,100:100:50' into Milestone list. Skips malformed
-    entries. Sorted ascending by mult."""
+    entries. Sorted ascending by mult. floor_after may be 0 (no trailing floor,
+    used for moonbag stages)."""
     out: List[Milestone] = []
     if not cfg_str:
         return out
@@ -99,18 +100,17 @@ def evaluate_ladder(
         return LadderAction(LadderActionType.SELL_ALL, 100.0, f"rug_stop ({ratio:.2f}x)")
 
     # Arm the trailing floor when peak has cleared the CURRENT FLOOR by the arm bonus.
-    # (Not the milestone — keying off the floor means arming is naturally satisfied
-    # immediately after a ratchet, since peak >= milestone.mult > floor_after always
-    # for a well-formed ladder.)
-    if state.current_floor is not None and not state.floor_armed:
+    # A floor of 0 means "no trailing floor" (used for moonbag stages).
+    if state.current_floor is not None and state.current_floor > 0 and not state.floor_armed:
         if state.peak_ratio >= state.current_floor * (1 + floor_arm_bonus_pct / 100.0):
             state.floor_armed = True
 
-    # Trailing floor exit
-    if state.current_floor is not None and state.floor_armed and ratio <= state.current_floor:
+    # Trailing floor exit — only if floor is set AND > 0 AND armed
+    if (state.current_floor is not None and state.current_floor > 0
+            and state.floor_armed and ratio <= state.current_floor):
         return LadderAction(
             LadderActionType.SELL_ALL, 100.0,
-            f"trailing_floor ({state.current_floor:.1f}x from peak {state.peak_ratio:.1f}x)"
+            f"trailing_floor ({state.current_floor:.1f} from peak {state.peak_ratio:.1f})"
         )
 
     # Milestone advance: find the LOWEST not-yet-hit milestone that ratio has crossed
