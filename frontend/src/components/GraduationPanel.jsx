@@ -185,8 +185,8 @@ export default function GraduationPanel() {
           <div>Slippage: <span className="text-cyan-300">{cfg.slippage_bps ? `${cfg.slippage_bps / 100}%` : "—"}</span></div>
           <div>Min pool: <span className="text-cyan-300">{cfg.min_pool_sol ?? "—"} SOL</span></div>
           <div>Hold max: <span className="text-cyan-300">{cfg.hold_max_seconds ?? "—"}s</span></div>
-          <div>TP: <span className="text-emerald-300">{cfg.take_profit_mult ?? "—"}x</span></div>
-          <div>SL: <span className="text-red-300">{cfg.stop_loss_mult ?? "—"}x</span></div>
+          <div data-testid="graduation-cfg-ladder">Ladder: <span className="text-emerald-300">{(cfg.ladder || []).map(m => `${m.mult}x→${m.sell_pct}%→floor${m.floor_after}x`).join(" | ") || "—"}</span></div>
+          <div data-testid="graduation-cfg-rugstop">Rug stop: <span className="text-red-300">{cfg.rug_stop_mult ?? "—"}x</span></div>
           <div>PumpSwap: <span className={cfg.pumpswap_enabled ? "text-emerald-300" : "text-slate-500"}>{cfg.pumpswap_enabled ? "on" : "off"}</span></div>
           <div>Bonk: <span className={cfg.bonk_enabled ? "text-emerald-300" : "text-slate-500"}>{cfg.bonk_enabled ? "on" : "off"}</span></div>
         </div>
@@ -273,6 +273,8 @@ export default function GraduationPanel() {
                     className={
                       p.event === "opened"
                         ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        : p.event === "partial_sell"
+                        ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
                         : p.event === "closed"
                         ? (p.pnl_sol > 0
                             ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
@@ -293,8 +295,13 @@ export default function GraduationPanel() {
               </div>
               <div className="mt-1 text-slate-400 flex flex-wrap gap-x-3">
                 {p.verdict && <span>verdict: <span className="text-slate-200">{p.verdict}</span></span>}
+                {p.reason && p.event === "partial_sell" && <span className="text-purple-300">{p.reason}</span>}
+                {p.ratio != null && <span>ratio: <span className="text-emerald-300">{p.ratio}x</span></span>}
+                {p.peak_ratio != null && <span>peak: <span className="text-amber-300">{p.peak_ratio}x</span></span>}
+                {p.current_floor != null && <span>floor: {p.current_floor}x</span>}
+                {p.sell_pct_of_current != null && <span>sold: {p.sell_pct_of_current}%</span>}
                 {p.buy_sol != null && <span>buy: {p.buy_sol} SOL</span>}
-                {p.sell_sol_received != null && <span>sold: {p.sell_sol_received} SOL</span>}
+                {p.sell_sol_received != null && <span>total sold: {p.sell_sol_received} SOL</span>}
                 {p.pnl_pct != null && (
                   <span>
                     PnL:{" "}

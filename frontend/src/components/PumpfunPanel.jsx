@@ -165,7 +165,8 @@ export default function PumpfunPanel() {
           <div>Priority fee: <span className="text-fuchsia-300">{cfg.priority_fee_sol ?? "—"} SOL</span></div>
           <div>Hold max: <span className="text-fuchsia-300">{cfg.hold_max_seconds ?? "—"}s</span></div>
           <div>T22 rug ext: <span className="text-fuchsia-300">{cfg.reject_dangerous_t22 ? "reject" : "allow"}</span></div>
-          <div>TP/SL: <span className="text-slate-400">advisory ({cfg.take_profit_mult ?? "—"}x / {cfg.stop_loss_mult ?? "—"}x, time-limit only)</span></div>
+          <div data-testid="pumpfun-cfg-ladder">Ladder: <span className="text-emerald-300">{(autobuy?.ladder || []).map(m => `${m.mult}x→${m.sell_pct}%→floor${m.floor_after}x`).join(" | ") || "—"}</span></div>
+          <div data-testid="pumpfun-cfg-rugstop">Rug stop: <span className="text-red-300">{autobuy?.rug_stop_mult ?? "—"}x</span></div>
         </div>
         {autobuy?.last_reason && (
           <div className="mt-2 text-slate-500">
@@ -257,6 +258,8 @@ export default function PumpfunPanel() {
                     className={
                       p.event === "opened"
                         ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        : p.event === "partial_sell"
+                        ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
                         : p.event === "closed"
                         ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
                         : p.event === "rejected"
@@ -274,6 +277,12 @@ export default function PumpfunPanel() {
               </div>
               <div className="mt-1 text-slate-400 flex flex-wrap gap-x-3">
                 {p.verdict && <span>verdict: <span className="text-slate-200">{p.verdict}</span></span>}
+                {p.reason && p.event === "partial_sell" && <span className="text-purple-300">{p.reason}</span>}
+                {p.ratio != null && <span>ratio: <span className="text-emerald-300">{p.ratio}x</span></span>}
+                {p.peak_ratio != null && <span>peak: <span className="text-amber-300">{p.peak_ratio}x</span></span>}
+                {p.current_floor != null && <span>floor: {p.current_floor}x</span>}
+                {p.sell_pct_of_current != null && <span>sold: {p.sell_pct_of_current}%</span>}
+                {p.remaining_pct_of_original != null && <span>remaining: {p.remaining_pct_of_original}%</span>}
                 {p.buy_sol != null && <span>buy: {p.buy_sol} SOL</span>}
                 {p.dev?.dev_hold_pct != null && (
                   <span>

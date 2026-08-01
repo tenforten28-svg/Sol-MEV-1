@@ -239,7 +239,8 @@ class TestAutobuyStatusNewKeys:
         assert c["require_authorities_revoked"] is True
 
     def test_existing_keys_intact(self, cfg):
-        assert cfg["tp_sl_enforced"] is False
+        # it17: tp_sl_enforced flipped to True — laddered exits are now enforced
+        assert cfg["tp_sl_enforced"] is True
         assert cfg["execution_backend"] == "pumpportal_local_tx + quicknode_rpc"
         assert cfg["enabled"] is False
         assert cfg["counters"]["buys_fired"] == 0

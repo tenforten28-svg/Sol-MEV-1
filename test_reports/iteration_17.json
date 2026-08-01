@@ -1,0 +1,58 @@
+{
+  "summary": "Iteration 17 (laddered moonbag exit) tested end-to-end. Created /app/backend/tests/test_exit_ladder_it17.py with 51 tests: 20 pure state-machine tests (parse_ladder, evaluate_ladder, record_milestone_hit, ratchet, arming, rug_stop, time_limit, one-step-per-eval), 16 integration tests across graduation_executor (mocked jupiter.get_quote + execute_swap) and pumpfun_autobuy (mocked _pumpportal_build_tx/_sign_and_send/_current_curve_price), plus API shape + 15-endpoint regression sweep. Full suite run: 158/158 passed (test_pumpfun_antirug 79 + it14 + it15 + it16 28 + it17 51). Frontend verified on the public URL: both panels render the ladder string and rug stop, TP/SL advisory lines removed, partial_sell events render with purple badge and ratio/peak/floor/sold%/remaining%. No live trading flags were enabled; no real PumpPortal/Jupiter/RPC calls made.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "pumpfun_autobuy._current_curve_price", "issue": "Makes TWO RPC round-trips per call: _check_curve_state() for virtual_sol_reserves then _check_curve_state_full() for virtual_token_reserves. Doubles RPC cost per position per monitor tick and mixes reserves read at two different slots (slightly inconsistent price). _check_curve_state_full already returns virtual_sol_reserves — use it alone."},
+      {"endpoint": "pumpfun_autobuy Position.entry_price", "issue": "If the bonding-curve read fails at buy time entry_price stays 0.0, so _evaluate_position can never compute a ratio and the position gets NO ladder/rug-stop protection — only the time_limit_no_quote exit at hold_max_seconds. Consider a lazy re-derivation of entry_price or aborting/flagging the buy when entry price is unknown."},
+      {"endpoint": "exit_ladder.evaluate_ladder (floor arming)", "issue": "record_milestone_hit resets floor_armed=False on every ratchet, and re-arming requires peak_ratio >= new_milestone.mult * 1.05 (e.g. >= 21x for the 20x milestone). If price touches exactly 20.0x and immediately dumps, the old (already armed) 5x floor is discarded, the new 10x floor never arms, and rug_stop is disabled after the first milestone -> position has no downside exit until hold_max_seconds. Suggest arming against the floor itself (floor * 1.05) or carrying over the armed flag when peak already clears the new floor."},
+      {"endpoint": "exit_ladder.evaluate_ladder (arming lookup)", "issue": "The arming loop matches the milestone by `abs(m.floor_after - state.current_floor) < 1e-9`. If two milestones are configured with the same floor_after the wrong (lower-mult) milestone is matched and the floor arms too early. Prefer keying the arm threshold off the highest hit milestone index."},
+      {"endpoint": "graduation_executor._evaluate", "issue": "ratio is derived from a Jupiter quote sized at the FULL remaining token balance, so price impact is baked into the ratio; large positions will read a systematically lower multiple than the true mark price (milestones fire late). Acceptable as conservative, but worth documenting."},
+      {"endpoint": "pumpfun_autobuy._sell", "issue": "PumpPortal 'XX%' is a percentage of the CURRENT wallet balance for that mint, while remaining_pct_of_original is tracked multiplicatively in memory. Any external balance change or partial fill silently desyncs the two, and the <0.5% dust rule then decides closure from a stale number."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PumpfunPanel / GraduationPanel position events", "issue": "partial_sell reason is rendered TWICE — once as purple text (`p.reason && p.event === 'partial_sell'`) and again unconditionally further down (`p.reason` in amber). Verified live: 'milestone_5x_sell_80pct' and 'milestone_20x_sell_50pct' each appear 2x in the event row.", "selector": "[data-testid=\"pumpfun-position-0\"], [data-testid=\"graduation-position-0\"]", "priority": "MEDIUM"},
+      {"component": "GraduationPanel copy", "issue": "Stale text still advertises the removed TP/SL policy: line ~110 'then Jupiter-route buy with real TP/SL.' and footer line ~334 'Real TP/SL via Jupiter reverse quotes.' Should reference the laddered exit + trailing floor.", "selector": "[data-testid=\"graduation-panel\"]", "priority": "LOW"},
+      {"component": "GraduationPanel position events", "issue": "Graduation partial_sell docs carry `tokens_remaining` but the UI never renders it, while PumpfunPanel shows `remaining: X%`. Inconsistent — grad users can't see how much moonbag is left.", "selector": "[data-testid=\"graduation-position-0\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pump.fun Sniper / Graduation config strip", "issues": ["The ladder string wraps to 3 lines inside a single 5-column grid cell, making that config row ~3x taller than its neighbours and leaving a ragged block. Consider giving the Ladder cell col-span-2/3 or rendering the milestones as chips."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_exit_ladder_it17.py",
+    "/app/backend/tests/seed_ladder_events.py",
+    "/app/test_reports/pytest/it17_results.xml"
+  ],
+  "action_items": [
+    "De-duplicate the partial_sell `reason` rendering in PumpfunPanel.jsx (~line 280 vs 325) and GraduationPanel.jsx (~line 298 vs 315).",
+    "Collapse _current_curve_price to a single _check_curve_state_full RPC call.",
+    "Close the trailing-floor arming gap after a ratchet (arm off floor*1.05, or preserve armed state when peak already clears the new floor) — currently a position can be fully unprotected between milestone N and peak >= milestone(N).mult*1.05.",
+    "Handle entry_price == 0.0 (curve read failed at buy) so the ladder is not silently disabled for that position.",
+    "Update GraduationPanel copy that still says 'real TP/SL' and optionally render tokens_remaining/remaining% for graduation partial sells."
+  ],
+  "critical_code_review_comments": [
+    "record_milestone_hit correctly ratchets floor UP only and is only invoked after a confirmed sell in BOTH bots — verified by test that a failed execute_swap/_sign_and_send leaves milestones_hit and token/remaining accounting untouched (sell_failed event only). Good fail-safe design.",
+    "evaluate_ladder does not mutate milestones_hit, so a caller that forgets record_milestone_hit would loop-sell the same milestone forever. Both current call sites are correct, but a defensive guard/log would be cheap insurance.",
+    "graduation ratio normalization by frac_remaining = tokens_out/tokens_original is correct: after an 80% sell at a flat price the ratio still reads 5.0x (verified in test_ratio_normalized_after_partial).",
+    "pumpfun_autobuy.py is 938 lines and graduation_executor.py 520 — pumpfun_autobuy should be split (curve-reads / safety filters / execution) per the >700-line guideline.",
+    "Milestone boundaries are strict `ratio >= mult`; float noise in the quote path (observed 99.99999999999999 for a nominal 100x) can defer the final milestone by one tick. Harmless in production but worth a tiny epsilon if exactness matters."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_exit_ladder_it17.py (new)",
+    "/app/backend/tests/seed_ladder_events.py (new, seed/cleanup helper)",
+    "/app/backend/tests/test_pumpfun_antirug.py (stale assertion updated: tp_sl_enforced now True)",
+    "/app/frontend/src/components/PumpfunPanel.jsx (added data-testid pumpfun-cfg-ladder / pumpfun-cfg-rugstop)",
+    "/app/frontend/src/components/GraduationPanel.jsx (added data-testid graduation-cfg-ladder / graduation-cfg-rugstop)"
+  ],
+  "success_rate": {"backend": "100% (158/158 pytest)", "frontend": "95% (all ladder/rug-stop/partial_sell renders correct; 1 duplicate-text bug + stale TP/SL copy)"},
+  "seed_data_creation": "Two temporary partial_sell docs inserted into pumpfun_positions and graduation_positions (marked _test_seed: true) to exercise the UI badge/field rendering; both deleted after the run via `python tests/seed_ladder_events.py clean`. DB is clean.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "None required — app has no auth; /app/memory/test_credentials.md not needed for these flows.",
+  "context_for_next_testing_agent": "Run `cd /app/backend && python -m pytest tests/test_pumpfun_antirug.py tests/test_pumpfun_failclosed_it14.py tests/test_pumpfun_failclosed_it15.py tests/test_graduation_it16.py tests/test_exit_ladder_it17.py -p no:anchorpy -q` — baseline is 158 passed. it17 helpers _make_grad_executor / _make_pf build fully mocked executors (no network). Note: progression tests deliberately use quote_ratio=150 / price=150e-9 because a nominal 100x ratio computes as 99.999...x and misses the 100x milestone. Use tests/seed_ladder_events.py seed|clean for UI partial_sell fixtures; always clean up. New frontend testids: pumpfun-cfg-ladder, pumpfun-cfg-rugstop, graduation-cfg-ladder, graduation-cfg-rugstop.",
+  "rca_of_the_issue": "Duplicate reason text: both panels added a partial_sell-specific purple `{p.reason}` span without removing the pre-existing unconditional amber `{p.reason}` span, so every partial_sell row prints the milestone reason twice. Trailing-floor gap: record_milestone_hit unconditionally sets floor_armed=False on ratchet while evaluate_ladder's arm condition is peak >= milestone.mult*1.05, so a ratio that touches a milestone exactly and reverses can never re-arm the newly ratcheted floor, and rug_stop is already disabled once any milestone is hit."
+}

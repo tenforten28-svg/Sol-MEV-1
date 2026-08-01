@@ -26,6 +26,10 @@ from typing import Optional, Dict, Any
 
 from live_trader import get_live_trader
 from graduation_monitor import SOL_MINT
+from exit_ladder import (
+    parse_ladder, evaluate_ladder, record_milestone_hit,
+    LadderState, LadderActionType, DEFAULT_LADDER_CFG, DEFAULT_RUG_STOP,
+)
 
 logger = logging.getLogger("graduation_executor")
 
@@ -59,8 +63,13 @@ class GraduationExecutorConfig:
         self.cooldown_sec = _fint("GRADUATION_COOLDOWN_SEC", 20)
         self.settle_delay_sec = _fint("GRADUATION_SETTLE_DELAY", 3)
         self.hold_max_seconds = _fint("GRADUATION_HOLD_MAX_SEC", 180)
+        # Legacy TP/SL retained as observability but ladder overrides them.
         self.take_profit_mult = _fflt("GRADUATION_TAKE_PROFIT", 1.5)
         self.stop_loss_mult = _fflt("GRADUATION_STOP_LOSS", 0.7)
+        # Laddered exit config: "mult:pct_of_remaining:floor_after,..." (ascending mult)
+        self.ladder_cfg = os.environ.get("GRADUATION_LADDER", DEFAULT_LADDER_CFG).strip()
+        self.rug_stop_mult = _fflt("GRADUATION_RUG_STOP", DEFAULT_RUG_STOP)
+        self.ladder = parse_ladder(self.ladder_cfg)
         self.check_interval_sec = _fint("GRADUATION_CHECK_INTERVAL", 5)
         self.min_pool_sol = _fflt("GRADUATION_MIN_POOL_SOL", 50.0)
         self.slippage_bps = _fint("GRADUATION_SLIPPAGE_BPS", 1500)  # 15% (volatile snipes)
@@ -76,10 +85,15 @@ class GraduationPosition:
         self.pool = pool
         self.source = source
         self.buy_sol = buy_sol
-        self.tokens_out = tokens_out    # base units of the token we hold
+        self.tokens_out = tokens_out    # base units of the token we hold (mutable — decreases on partial sells)
+        self.tokens_original = tokens_out  # never changed; for pct-of-original accounting
         self.buy_signature = buy_signature
         self.opened_at = opened_at
         self.closed = False
+        # Ladder state
+        self.ladder_state = LadderState()
+        # For UI: history of partial-sell events
+        self.partial_sells: list = []  # list of dicts with {milestone, ratio, sol_received, signature, ts}
 
 
 class GraduationExecutor:
@@ -259,105 +273,186 @@ class GraduationExecutor:
                 if not self.positions or not self.lt.ready:
                     continue
                 for mint, pos in list(self.positions.items()):
-                    verdict = await self._evaluate(pos)
-                    if verdict:
-                        await self._sell(mint, verdict)
+                    decision = await self._evaluate(pos)
+                    if decision:
+                        await self._sell(mint, decision)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.warning(f"[grad-monitor] loop error: {e}")
 
-    async def _evaluate(self, pos: GraduationPosition) -> Optional[str]:
+    async def _evaluate(self, pos: GraduationPosition) -> Optional[Dict[str, Any]]:
+        """Returns {action, ratio, ...} for the position, or None to hold.
+
+        Uses Jupiter reverse quote on a UNIT probe (all our current tokens) to
+        determine current price relative to entry. Feeds into the exit ladder."""
         age = time.time() - pos.opened_at
-        if age >= self.cfg.hold_max_seconds:
-            return "time_limit"
-        # Real price check via Jupiter reverse quote
+        hold_expired = age >= self.cfg.hold_max_seconds
         if pos.tokens_out <= 0:
-            return None  # can't evaluate — will exit on time_limit
+            if hold_expired:
+                return {"action": "sell_all", "sell_pct": 100.0, "reason": "time_limit",
+                        "ratio": None, "milestone_index": None}
+            return None
         try:
             quote = await self.lt.jupiter.get_quote(
                 pos.mint, SOL_MINT, pos.tokens_out, self.cfg.slippage_bps
             )
-            out_amount = int(quote.get("outAmount") or 0)
-            sol_now = out_amount / LAMPORTS_PER_SOL
-            if pos.buy_sol <= 0:
+            sol_out = int(quote.get("outAmount") or 0) / LAMPORTS_PER_SOL
+            if pos.buy_sol <= 0 or sol_out <= 0:
                 return None
-            ratio = sol_now / pos.buy_sol
-            if ratio >= self.cfg.take_profit_mult:
-                return f"take_profit ({ratio:.2f}x)"
-            if ratio <= self.cfg.stop_loss_mult:
-                return f"stop_loss ({ratio:.2f}x)"
+            # Value ratio: current-SOL-out (from remaining tokens) / SOL-value at entry (for that same fraction)
+            # Since tokens_out shrinks after partial sells, we normalize:
+            #   entry_value_of_remaining = buy_sol * (tokens_out / tokens_original)
+            frac_remaining = pos.tokens_out / pos.tokens_original if pos.tokens_original else 1.0
+            entry_value = pos.buy_sol * frac_remaining
+            ratio = sol_out / entry_value if entry_value > 0 else 0.0
         except Exception as e:
             logger.debug(f"[grad-eval] quote failed for {pos.mint[:6]}: {e}")
-        return None
+            if hold_expired:
+                return {"action": "sell_all", "sell_pct": 100.0, "reason": "time_limit",
+                        "ratio": None, "milestone_index": None}
+            return None
 
-    async def _sell(self, mint: str, verdict: str):
+        action = evaluate_ladder(
+            ratio=ratio,
+            milestones=self.cfg.ladder,
+            state=pos.ladder_state,
+            rug_stop_mult=self.cfg.rug_stop_mult,
+            hold_expired=hold_expired,
+        )
+        if action.type == LadderActionType.HOLD:
+            return None
+        return {
+            "action": "sell_all" if action.type == LadderActionType.SELL_ALL else "sell_partial",
+            "sell_pct": action.sell_pct,
+            "reason": action.reason,
+            "ratio": ratio,
+            "milestone_index": action.milestone_index,
+        }
+
+    async def _sell(self, mint: str, decision: Dict[str, Any]):
+        """Execute a partial or full sell based on ladder decision."""
         pos = self.positions.get(mint)
         if not pos or pos.closed:
             return
         if pos.tokens_out <= 0:
-            # Nothing to sell — mark closed and record
             pos.closed = True
             self.positions.pop(mint, None)
-            await self._record_event(mint, "closed", {
-                "verdict": verdict + " (no tokens tracked)",
-                "buy_signature": pos.buy_signature, "buy_sol": pos.buy_sol,
-                "hold_seconds": time.time() - pos.opened_at,
-            })
             return
-        logger.info(f"[grad-sell] {mint[:6]} verdict={verdict}")
+
+        sell_pct = decision.get("sell_pct", 100.0)
+        reason = decision.get("reason", "")
+        ratio = decision.get("ratio")
+        milestone_index = decision.get("milestone_index")
+        is_partial = decision.get("action") == "sell_partial"
+
+        tokens_to_sell = int(pos.tokens_out * sell_pct / 100.0)
+        if tokens_to_sell <= 0:
+            return
+
+        logger.info(f"[grad-sell] {mint[:6]} {reason} sell_pct={sell_pct:.1f}% ratio={ratio}")
         prev_slip = self.lt.cfg.slippage_bps
         self.lt.cfg.slippage_bps = self.cfg.slippage_bps
         try:
-            result = await self.lt.execute_swap(mint, SOL_MINT, pos.tokens_out)
+            result = await self.lt.execute_swap(mint, SOL_MINT, tokens_to_sell)
         finally:
             self.lt.cfg.slippage_bps = prev_slip
 
         self.sells_fired += 1
-        pos.closed = True
-        sell_sig = result.get("signature")
         sol_received = 0.0
         try:
             sol_received = int(result.get("out_amount") or result.get("outAmount") or 0) / LAMPORTS_PER_SOL
         except Exception:
             pass
-        pnl_sol = sol_received - pos.buy_sol
-        pnl_pct = (pnl_sol / pos.buy_sol * 100) if pos.buy_sol > 0 else 0.0
 
-        await self._record_event(mint, "closed", {
-            "verdict": verdict,
-            "buy_signature": pos.buy_signature,
-            "sell_signature": sell_sig,
-            "buy_sol": pos.buy_sol,
-            "sell_sol_received": round(sol_received, 6),
-            "pnl_sol": round(pnl_sol, 6),
-            "pnl_pct": round(pnl_pct, 2),
-            "hold_seconds": round(time.time() - pos.opened_at, 1),
-            "solscan_sell": f"https://solscan.io/tx/{sell_sig}" if sell_sig else None,
-            "sell_success": result.get("success", False),
+        if not result.get("success"):
+            # Do NOT mark milestone hit — retry later
+            await self._record_event(mint, "sell_failed", {
+                "reason": reason, "sell_pct": sell_pct, "ratio": ratio,
+                "signature": result.get("signature"),
+                "error": result.get("error"),
+                "solscan_url": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
+            })
+            return
+
+        # Success — advance state
+        pos.tokens_out -= tokens_to_sell
+        if is_partial and milestone_index is not None:
+            record_milestone_hit(pos.ladder_state, self.cfg.ladder, milestone_index)
+
+        pos.partial_sells.append({
+            "at": datetime.now(timezone.utc).isoformat(),
+            "reason": reason,
+            "ratio": round(ratio, 3) if ratio else None,
+            "sell_pct_of_current": round(sell_pct, 2),
+            "sol_received": round(sol_received, 6),
+            "signature": result["signature"],
+            "milestone_index": milestone_index,
         })
-        # Trade row (for LiveTradingPanel visibility)
-        try:
-            await self.db.trades.insert_one({
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "pair": f"SOL->{mint[:6]}..->SOL",
-                "type": "live_graduation_snipe",
-                "source": pos.source,
-                "amount_sol": pos.buy_sol,
-                "sell_sol_received": round(sol_received, 6),
+
+        # If fully closed OR sell_all, finalize
+        fully_closed = (not is_partial) or pos.tokens_out <= 0
+        if fully_closed:
+            pos.closed = True
+
+            # Aggregate PnL from all partial sells + this final one
+            total_sold_sol = sum(p["sol_received"] for p in pos.partial_sells)
+            pnl_sol = total_sold_sol - pos.buy_sol
+            pnl_pct = (pnl_sol / pos.buy_sol * 100) if pos.buy_sol > 0 else 0.0
+
+            await self._record_event(mint, "closed", {
+                "verdict": reason,
+                "buy_signature": pos.buy_signature,
+                "sell_signature": result["signature"],
+                "buy_sol": pos.buy_sol,
+                "sell_sol_received": round(total_sold_sol, 6),
                 "pnl_sol": round(pnl_sol, 6),
                 "pnl_pct": round(pnl_pct, 2),
-                "success": bool(result.get("success")),
-                "signature": sell_sig,
-                "buy_signature": pos.buy_signature,
-                "solscan_url": f"https://solscan.io/tx/{sell_sig}" if sell_sig else None,
-                "simulation": False,
-                "mint": mint,
-                "verdict": verdict,
+                "peak_ratio": round(pos.ladder_state.peak_ratio, 3),
+                "milestones_hit": pos.ladder_state.milestones_hit,
+                "partial_sells": pos.partial_sells,
+                "hold_seconds": round(time.time() - pos.opened_at, 1),
+                "solscan_sell": f"https://solscan.io/tx/{result['signature']}",
+                "sell_success": True,
             })
-        except Exception as e:
-            logger.warning(f"[grad-sell] mongo insert: {e}")
-        self.positions.pop(mint, None)
+            try:
+                await self.db.trades.insert_one({
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "pair": f"SOL->{mint[:6]}..->SOL",
+                    "type": "live_graduation_snipe",
+                    "source": pos.source,
+                    "amount_sol": pos.buy_sol,
+                    "sell_sol_received": round(total_sold_sol, 6),
+                    "pnl_sol": round(pnl_sol, 6),
+                    "pnl_pct": round(pnl_pct, 2),
+                    "success": True,
+                    "signature": result["signature"],
+                    "buy_signature": pos.buy_signature,
+                    "solscan_url": f"https://solscan.io/tx/{result['signature']}",
+                    "simulation": False,
+                    "mint": mint,
+                    "verdict": reason,
+                    "peak_ratio": round(pos.ladder_state.peak_ratio, 3),
+                    "milestones_hit": len(pos.ladder_state.milestones_hit),
+                })
+            except Exception as e:
+                logger.warning(f"[grad-sell] mongo insert: {e}")
+            self.positions.pop(mint, None)
+        else:
+            # Partial sell — position stays open
+            await self._record_event(mint, "partial_sell", {
+                "reason": reason,
+                "ratio": round(ratio, 3) if ratio else None,
+                "sell_pct_of_current": round(sell_pct, 2),
+                "sell_signature": result["signature"],
+                "sol_received": round(sol_received, 6),
+                "solscan_sell": f"https://solscan.io/tx/{result['signature']}",
+                "milestone_index": milestone_index,
+                "milestones_hit": list(pos.ladder_state.milestones_hit),
+                "current_floor": pos.ladder_state.current_floor,
+                "peak_ratio": round(pos.ladder_state.peak_ratio, 3),
+                "tokens_remaining": pos.tokens_out,
+            })
 
     async def _record_event(self, mint: str, event: str, data: Dict):
         try:
@@ -387,6 +482,11 @@ class GraduationExecutor:
                 "slippage_bps": self.cfg.slippage_bps,
                 "pumpswap_enabled": self.cfg.pumpswap_enabled,
                 "bonk_enabled": self.cfg.bonk_enabled,
+                "ladder": [
+                    {"mult": m.mult, "sell_pct": m.sell_pct_of_remaining, "floor_after": m.floor_after}
+                    for m in self.cfg.ladder
+                ],
+                "rug_stop_mult": self.cfg.rug_stop_mult,
             },
             "counters": {
                 "events_seen": self.events_seen,

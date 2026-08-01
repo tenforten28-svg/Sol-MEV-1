@@ -41,6 +41,10 @@ from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
 from live_trader import get_live_trader
+from exit_ladder import (
+    parse_ladder, evaluate_ladder, record_milestone_hit,
+    LadderState, LadderActionType, DEFAULT_LADDER_CFG, DEFAULT_RUG_STOP,
+)
 
 logger = logging.getLogger("pumpfun_autobuy")
 
@@ -117,17 +121,27 @@ class AutoBuyConfig:
         self.min_curve_sol = _fflt("PUMPFUN_MIN_CURVE_SOL", 0.01)
         # Reject Token-2022 mints that have honeypot extensions (transfer fee, permanent delegate, etc.)
         self.reject_dangerous_t22 = _fbool("PUMPFUN_REJECT_DANGEROUS_T22", True)
+        # Laddered exit — same format as graduation: "mult:pct_of_remaining:floor_after,..."
+        self.ladder_cfg = os.environ.get("PUMPFUN_LADDER", DEFAULT_LADDER_CFG).strip()
+        self.rug_stop_mult = _fflt("PUMPFUN_RUG_STOP", DEFAULT_RUG_STOP)
+        self.ladder = parse_ladder(self.ladder_cfg)
 
 
 class Position:
     def __init__(self, mint: str, buy_sol: float, token_amount: float,
-                 buy_signature: str, opened_at: float):
+                 buy_signature: str, opened_at: float,
+                 entry_price: float = 0.0):
         self.mint = mint
         self.buy_sol = buy_sol          # SOL spent
         self.token_amount = token_amount  # tokens received (whole units)
         self.buy_signature = buy_signature
         self.opened_at = opened_at
         self.closed = False
+        # Ladder-exit state
+        self.entry_price = entry_price   # SOL per token (from bonding curve at buy time)
+        self.remaining_pct_of_original = 100.0
+        self.ladder_state = LadderState()
+        self.partial_sells: list = []
 
 
 class PumpFunAutoBuyer:
@@ -608,14 +622,27 @@ class PumpFunAutoBuyer:
             })
             return {"ok": False, "reason": f"buy tx failed: {result.get('error')}", "signature": result.get("signature")}
 
-        # Position opened — token_amount unknown until we parse post-tx balance;
-        # for now we track approx via subsequent quote round-trip; sell uses percentOfTokens.
+        # Position opened. Capture entry price from bonding curve NOW (right after buy)
+        # so the ladder has a reference. Slight over-estimate of fill price (curve moved by
+        # our own buy) but close enough for milestone multipliers.
+        entry_price = 0.0
+        try:
+            entry_curve = await self._check_curve_state_full(mint)
+            if entry_curve.get("ok"):
+                vsr = entry_curve.get("virtual_sol_reserves") or 0
+                vtr = entry_curve.get("virtual_token_reserves") or 0
+                if vsr and vtr:
+                    entry_price = vsr / vtr
+        except Exception:
+            pass
+
         pos = Position(
             mint=mint,
             buy_sol=self.cfg.buy_sol,
             token_amount=0.0,  # unknown; sell path uses percentage of token account balance
             buy_signature=result["signature"],
             opened_at=time.time(),
+            entry_price=entry_price,
         )
         self.positions[mint] = pos
         self.buys_successful += 1
@@ -641,66 +668,205 @@ class PumpFunAutoBuyer:
                     continue
                 to_close = []
                 for mint, pos in list(self.positions.items()):
-                    verdict = await self._evaluate_position(pos)
-                    if verdict:
-                        to_close.append((mint, verdict))
-                for mint, verdict in to_close:
-                    await self._sell(mint, verdict)
+                    decision = await self._evaluate_position(pos)
+                    if decision:
+                        to_close.append((mint, decision))
+                for mint, decision in to_close:
+                    await self._sell(mint, decision)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.warning(f"[pumpfun-monitor] loop error: {e}")
 
-    async def _evaluate_position(self, pos: Position) -> Optional[str]:
-        """Only time-based exit is enforced on-chain. TP/SL config is advisory in this
-        version (price-based exits require bonding-curve account decoding which we
-        deliberately skip to keep this path minimal). See status().tp_sl_enforced."""
-        age = time.time() - pos.opened_at
-        if age >= self.cfg.hold_max_seconds:
-            return "time_limit"
-        return None
+    async def _current_curve_price(self, mint: str) -> Optional[float]:
+        """Live bonding-curve price in SOL per raw token unit.
+        price = virtual_sol_reserves / virtual_token_reserves."""
+        curve = await self._check_curve_state(mint)
+        if not curve.get("ok"):
+            return None
+        vsr = curve.get("virtual_sol_reserves") or 0
+        vtr = None
+        # We already computed real_token_reserves but need virtual_token_reserves —
+        # re-parse from raw bytes. Simpler: refetch by calling _check_curve_state which
+        # already unpacks all fields; we need to expose vtr. Small internal enhancement below.
+        # For now compute from complementary fields:
+        # vsr, vtr, rtr, rsr, tts = struct.unpack('<QQQQQ', raw[8:48])
+        # _check_curve_state currently doesn't return vtr — patch it via re-read.
+        curve2 = await self._check_curve_state_full(mint)
+        if not curve2.get("ok"):
+            return None
+        vtr = curve2.get("virtual_token_reserves") or 0
+        if not vsr or not vtr:
+            return None
+        return vsr / vtr    # lamports per raw-token-unit
 
-    async def _sell(self, mint: str, verdict: str):
+    async def _check_curve_state_full(self, mint: str) -> Dict[str, Any]:
+        """Same as _check_curve_state but also returns virtual_token_reserves.
+        (Kept separate to avoid changing the safety-filter's public shape.)"""
+        if not self.lt.cfg.rpc_url:
+            return {"ok": False, "reason": "no rpc"}
+        try:
+            curve_pda = self._bonding_curve_pda(mint)
+        except Exception as e:
+            return {"ok": False, "reason": f"pda derive failed: {e}"}
+        payload = {
+            "jsonrpc": "2.0", "id": 1, "method": "getAccountInfo",
+            "params": [str(curve_pda), {"encoding": "base64", "commitment": "confirmed"}],
+        }
+        try:
+            s = await self._http()
+            async with s.post(self.lt.cfg.rpc_url, json=payload, timeout=10) as r:
+                data = await r.json()
+            val = (data.get("result") or {}).get("value") or {}
+            data_field = val.get("data") or []
+            if not data_field or len(data_field) < 1:
+                return {"ok": False, "reason": "no data"}
+            raw = base64.b64decode(data_field[0])
+            if len(raw) < 49:
+                return {"ok": False, "reason": "too short"}
+            vtr, vsr, rtr, rsr, tts = struct.unpack("<QQQQQ", raw[8:48])
+            complete = bool(raw[48])
+            return {
+                "ok": True,
+                "virtual_token_reserves": vtr,
+                "virtual_sol_reserves": vsr,
+                "real_sol_reserves": rsr,
+                "complete": complete,
+            }
+        except Exception as e:
+            return {"ok": False, "reason": f"read: {e}"}
+
+    async def _evaluate_position(self, pos: Position) -> Optional[Dict[str, Any]]:
+        """Return {action, sell_pct, reason, ratio, milestone_index} or None."""
+        age = time.time() - pos.opened_at
+        hold_expired = age >= self.cfg.hold_max_seconds
+
+        ratio = None
+        if pos.entry_price and pos.entry_price > 0:
+            current_price = await self._current_curve_price(pos.mint)
+            if current_price is not None:
+                ratio = current_price / pos.entry_price
+
+        # If we can't quote and time is up, fall back to time_limit exit
+        if ratio is None:
+            if hold_expired:
+                return {"action": "sell_all", "sell_pct": 100.0,
+                        "reason": "time_limit_no_quote", "ratio": None,
+                        "milestone_index": None}
+            return None
+
+        action = evaluate_ladder(
+            ratio=ratio,
+            milestones=self.cfg.ladder,
+            state=pos.ladder_state,
+            rug_stop_mult=self.cfg.rug_stop_mult,
+            hold_expired=hold_expired,
+        )
+        if action.type == LadderActionType.HOLD:
+            return None
+        return {
+            "action": "sell_all" if action.type == LadderActionType.SELL_ALL else "sell_partial",
+            "sell_pct": action.sell_pct,
+            "reason": action.reason,
+            "ratio": ratio,
+            "milestone_index": action.milestone_index,
+        }
+
+    async def _sell(self, mint: str, decision: Dict[str, Any]):
+        """Ladder-aware sell: partial or full, via PumpPortal amount='XX%' (of current
+        wallet balance) — no need to track exact token count."""
         pos = self.positions.get(mint)
         if not pos or pos.closed:
             return
-        logger.info(f"[pumpfun-sell] {mint[:8]} verdict={verdict}")
+        sell_pct = float(decision.get("sell_pct") or 100.0)
+        # PumpPortal wants a string like "80%"; clamp to sensible bounds
+        sell_pct = max(1.0, min(100.0, sell_pct))
+        reason = decision.get("reason") or "unknown"
+        ratio = decision.get("ratio")
+        milestone_index = decision.get("milestone_index")
+        is_partial = decision.get("action") == "sell_partial"
+
+        logger.info(f"[pumpfun-sell] {mint[:8]} {reason} pct={sell_pct:.1f}%")
         try:
-            # Sell 100% of the position via pumpportal (denominatedInSol=false, amount=100%)
-            tx_bytes = await self._pumpportal_build_tx("sell", mint, "100%", denominated_in_sol=False)
+            tx_bytes = await self._pumpportal_build_tx(
+                "sell", mint, f"{sell_pct:g}%", denominated_in_sol=False
+            )
         except Exception as e:
             logger.warning(f"[pumpfun-sell] build failed: {e}")
             return
         result = await self._sign_and_send(tx_bytes)
         self.sells_fired += 1
-        pos.closed = True
 
-        await self._record_position_event(mint, "closed", {
-            "verdict": verdict,
-            "sell_signature": result.get("signature"),
-            "buy_signature": pos.buy_signature,
-            "buy_sol": pos.buy_sol,
-            "hold_seconds": time.time() - pos.opened_at,
-            "solscan_sell": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
-            "success": result.get("success", False),
-        })
-        # Persist a trade row so LiveTradingPanel picks it up
-        try:
-            await self.db.trades.insert_one({
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "pair": f"SOL->{mint[:6]}..->SOL",
-                "type": "live_pumpfun_snipe",
-                "amount_sol": pos.buy_sol,
-                "success": result.get("success", False),
+        if not result.get("success"):
+            await self._record_position_event(mint, "sell_failed", {
+                "reason": reason, "sell_pct": sell_pct, "ratio": ratio,
                 "signature": result.get("signature"),
+                "error": result.get("error"),
                 "solscan_url": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
-                "simulation": False,
-                "mint": mint,
-                "verdict": verdict,
             })
-        except Exception as e:
-            logger.warning(f"[pumpfun-sell] mongo insert failed: {e}")
-        self.positions.pop(mint, None)
+            return
+
+        # Success — advance ladder state, decrement remaining_pct
+        pos.remaining_pct_of_original *= (1 - sell_pct / 100.0)
+        if is_partial and milestone_index is not None:
+            record_milestone_hit(pos.ladder_state, self.cfg.ladder, milestone_index)
+
+        pos.partial_sells.append({
+            "at": datetime.now(timezone.utc).isoformat(),
+            "reason": reason,
+            "ratio": round(ratio, 3) if ratio else None,
+            "sell_pct_of_current": round(sell_pct, 2),
+            "signature": result["signature"],
+            "milestone_index": milestone_index,
+        })
+
+        fully_closed = (not is_partial) or pos.remaining_pct_of_original < 0.5   # sub-0.5% is dust
+        if fully_closed:
+            pos.closed = True
+            await self._record_position_event(mint, "closed", {
+                "verdict": reason,
+                "buy_signature": pos.buy_signature,
+                "sell_signature": result["signature"],
+                "buy_sol": pos.buy_sol,
+                "peak_ratio": round(pos.ladder_state.peak_ratio, 3),
+                "milestones_hit": pos.ladder_state.milestones_hit,
+                "partial_sells": pos.partial_sells,
+                "hold_seconds": round(time.time() - pos.opened_at, 1),
+                "solscan_sell": f"https://solscan.io/tx/{result['signature']}",
+                "success": True,
+            })
+            try:
+                await self.db.trades.insert_one({
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "pair": f"SOL->{mint[:6]}..->SOL",
+                    "type": "live_pumpfun_snipe",
+                    "amount_sol": pos.buy_sol,
+                    "success": True,
+                    "signature": result["signature"],
+                    "buy_signature": pos.buy_signature,
+                    "solscan_url": f"https://solscan.io/tx/{result['signature']}",
+                    "simulation": False,
+                    "mint": mint,
+                    "verdict": reason,
+                    "peak_ratio": round(pos.ladder_state.peak_ratio, 3),
+                    "milestones_hit": len(pos.ladder_state.milestones_hit),
+                })
+            except Exception as e:
+                logger.warning(f"[pumpfun-sell] mongo insert failed: {e}")
+            self.positions.pop(mint, None)
+        else:
+            await self._record_position_event(mint, "partial_sell", {
+                "reason": reason,
+                "ratio": round(ratio, 3) if ratio else None,
+                "sell_pct_of_current": round(sell_pct, 2),
+                "remaining_pct_of_original": round(pos.remaining_pct_of_original, 2),
+                "sell_signature": result["signature"],
+                "solscan_sell": f"https://solscan.io/tx/{result['signature']}",
+                "milestone_index": milestone_index,
+                "milestones_hit": list(pos.ladder_state.milestones_hit),
+                "current_floor": pos.ladder_state.current_floor,
+                "peak_ratio": round(pos.ladder_state.peak_ratio, 3),
+            })
 
     async def _record_position_event(self, mint: str, event: str, data: Dict):
         try:
@@ -749,8 +915,13 @@ class PumpFunAutoBuyer:
             "last_reason": self.last_reason,
             "live_trader_ready": self.lt.ready,
             "execution_backend": "pumpportal_local_tx + quicknode_rpc",
-            "tp_sl_enforced": False,
-            "exit_policy": "time_limit only (TP/SL values in config are advisory in this version)",
+            "tp_sl_enforced": True,
+            "exit_policy": f"laddered exits via bonding-curve price feed. ladder={self.cfg.ladder_cfg}, rug_stop={self.cfg.rug_stop_mult}x",
+            "ladder": [
+                {"mult": m.mult, "sell_pct": m.sell_pct_of_remaining, "floor_after": m.floor_after}
+                for m in self.cfg.ladder
+            ],
+            "rug_stop_mult": self.cfg.rug_stop_mult,
         }
 
 
