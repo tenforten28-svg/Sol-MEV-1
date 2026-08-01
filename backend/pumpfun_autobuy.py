@@ -680,25 +680,15 @@ class PumpFunAutoBuyer:
 
     async def _current_curve_price(self, mint: str) -> Optional[float]:
         """Live bonding-curve price in SOL per raw token unit.
-        price = virtual_sol_reserves / virtual_token_reserves."""
-        curve = await self._check_curve_state(mint)
+        price = virtual_sol_reserves / virtual_token_reserves. Single RPC call."""
+        curve = await self._check_curve_state_full(mint)
         if not curve.get("ok"):
             return None
         vsr = curve.get("virtual_sol_reserves") or 0
-        vtr = None
-        # We already computed real_token_reserves but need virtual_token_reserves —
-        # re-parse from raw bytes. Simpler: refetch by calling _check_curve_state which
-        # already unpacks all fields; we need to expose vtr. Small internal enhancement below.
-        # For now compute from complementary fields:
-        # vsr, vtr, rtr, rsr, tts = struct.unpack('<QQQQQ', raw[8:48])
-        # _check_curve_state currently doesn't return vtr — patch it via re-read.
-        curve2 = await self._check_curve_state_full(mint)
-        if not curve2.get("ok"):
-            return None
-        vtr = curve2.get("virtual_token_reserves") or 0
+        vtr = curve.get("virtual_token_reserves") or 0
         if not vsr or not vtr:
             return None
-        return vsr / vtr    # lamports per raw-token-unit
+        return vsr / vtr
 
     async def _check_curve_state_full(self, mint: str) -> Dict[str, Any]:
         """Same as _check_curve_state but also returns virtual_token_reserves.
@@ -740,6 +730,16 @@ class PumpFunAutoBuyer:
         """Return {action, sell_pct, reason, ratio, milestone_index} or None."""
         age = time.time() - pos.opened_at
         hold_expired = age >= self.cfg.hold_max_seconds
+
+        # Lazily recover entry_price if the buy-time curve read failed.
+        # Without entry_price the ladder + rug_stop have no reference — a position
+        # with entry_price==0 would be unprotected. Try to backfill from the current
+        # curve state (over-estimate, but better than no protection).
+        if not pos.entry_price:
+            price = await self._current_curve_price(pos.mint)
+            if price:
+                pos.entry_price = price
+                logger.info(f"[pumpfun-eval] lazy entry_price backfill for {pos.mint[:8]}: {price:g}")
 
         ratio = None
         if pos.entry_price and pos.entry_price > 0:

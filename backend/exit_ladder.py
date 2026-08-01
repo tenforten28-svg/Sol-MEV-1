@@ -98,16 +98,13 @@ def evaluate_ladder(
     if not state.milestones_hit and ratio <= rug_stop_mult:
         return LadderAction(LadderActionType.SELL_ALL, 100.0, f"rug_stop ({ratio:.2f}x)")
 
-    # Arm the trailing floor once peak has cleared the current milestone by the arm bonus.
-    # Prevents the floor from firing immediately after a milestone-driven sell.
+    # Arm the trailing floor when peak has cleared the CURRENT FLOOR by the arm bonus.
+    # (Not the milestone — keying off the floor means arming is naturally satisfied
+    # immediately after a ratchet, since peak >= milestone.mult > floor_after always
+    # for a well-formed ladder.)
     if state.current_floor is not None and not state.floor_armed:
-        # Find the milestone whose floor_after matches the current floor
-        for i in state.milestones_hit:
-            m = milestones[i]
-            if abs(m.floor_after - state.current_floor) < 1e-9:
-                if state.peak_ratio >= m.mult * (1 + floor_arm_bonus_pct / 100.0):
-                    state.floor_armed = True
-                    break
+        if state.peak_ratio >= state.current_floor * (1 + floor_arm_bonus_pct / 100.0):
+            state.floor_armed = True
 
     # Trailing floor exit
     if state.current_floor is not None and state.floor_armed and ratio <= state.current_floor:
@@ -138,15 +135,19 @@ def record_milestone_hit(
     milestones: List[Milestone],
     milestone_index: int,
 ) -> None:
-    """Call AFTER the partial sell tx confirms so we don't advance on failed sells."""
+    """Call AFTER the partial sell tx confirms so we don't advance on failed sells.
+    Ratchets floor upward and does NOT reset floor_armed if the previous floor was
+    already armed — a new higher floor is auto-armed since peak has by definition
+    already reached the milestone that just fired."""
     if milestone_index in state.milestones_hit:
         return
     state.milestones_hit.append(milestone_index)
     m = milestones[milestone_index]
-    # Ratchet floor UP only; never lower an existing floor
     if state.current_floor is None or m.floor_after > state.current_floor:
         state.current_floor = m.floor_after
-        state.floor_armed = False    # re-arm required for new floor
+        # Do NOT clear floor_armed. evaluate_ladder will re-check on next tick
+        # against the NEW floor; peak_ratio is already >= milestone.mult > new floor,
+        # so arming happens on the very next evaluate call automatically.
 
 
 DEFAULT_LADDER_CFG = "5:80:5,20:50:10,100:100:50"

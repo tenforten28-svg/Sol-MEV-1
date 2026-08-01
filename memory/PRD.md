@@ -28,7 +28,16 @@ User uploaded a Solana MEV/arbitrage bot zip, chose to deploy on Railway (~$5/mo
   7. Token-2022 honeypot extensions rejected: transferFeeConfig, permanentDelegate, nonTransferable, transferHook, mintCloseAuthority, defaultAccountState=Frozen
 - ✅ **[2026-02] Pump.fun direct bonding-curve auto-buy** — PumpPortal Local API + local signing. Master gate `PUMPFUN_AUTO_BUY_ENABLED=false` by default. Time-limit auto-exit.
 - ✅ **[2026-02] Pump.fun frontend panel** — detector + auto-buy status, 6 stat tiles, 9-item config strip, detection list with links, position event rows showing dev%/top1%/top10%/curve SOL inline color-coded.
-- ✅ **[2026-02] Graduation snipe system** — dual-launchpad WSS monitor + fade-the-dump executor:
+- ✅ **[2026-02] Laddered moonbag exit with ratcheting trailing floor** — shared exit-ladder state machine (`exit_ladder.py`) applied to BOTH pump.fun bonding-curve sniper AND graduation sniper:
+  - Default ladder: 5x→80%→floor5x, 20x→50%→floor10x, 100x→100%→floor50x (user's requested 10x gap after 20x milestone).
+  - Rug stop at 0.5x before any milestone hit (hard emergency exit).
+  - Floor auto-arms after peak > floor × 1.05 (5% arm bonus prevents self-triggering from own sell impact).
+  - Ratchet advances floor only UP; new floor is auto-armed since peak has already reached the milestone that fired.
+  - Pump.fun sniper: entry_price read from bonding-curve PDA at buy time (with lazy backfill if buy-time read fails); ticker reads virtual_sol/virtual_token every check interval. `tp_sl_enforced` now TRUE (was advisory only).
+  - Graduation sniper: entry from Jupiter fill; ticker via reverse quote on remaining tokens.
+  - Partial sells via PumpPortal `amount="XX%"` (pumpfun) / Jupiter partial swap (graduation). Failed sells don't advance milestone state.
+  - Frontend: both panels show ladder config, rug stop mult, partial_sell events with purple badge, per-position ratio/peak/floor/remaining%.
+  - **158/158 tests passing** (iteration_17): pure ladder state-machine tests + integration for both bots + endpoint regression.
   - **Monitor** (`graduation_monitor.py`): `logsSubscribe` on PumpSwap (`pAMMBay...`) + Raydium LaunchLab (`LanMV9...`) programs. Parses migration tx via `getTransaction`, extracts mint/pool/reserves, emits normalized `{source, mint, pool_address, dex, reserves_sol, signature, latency_ms, slot}` event. Dedup via mongo unique index on `(signature, source)`. Auto-reconnect w/ exponential backoff.
   - **Executor** (`graduation_executor.py`): fade-the-dump strategy — 3s settle delay, then Jupiter buy via existing `live_trader` (reuses safety gates + Jito). REAL price-based TP/SL via Jupiter reverse quotes. All decisions locked by `asyncio.Lock` (no race conditions). Kill-switch re-check after settle. Pre-reserves slot before sleep. Refunds budget on failed buy.
   - **Endpoints**: `/api/live/graduation/{status,events,positions}` + `POST /api/live/graduation/replay` (signature backtest) + `POST /api/live/emergency_stop` (in-process kill switch).

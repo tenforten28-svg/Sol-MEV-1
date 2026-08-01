@@ -178,14 +178,18 @@ class TestEvaluateLadder:
         assert el.evaluate_ladder(0.3, [], st).type == el.LadderActionType.SELL_ALL
 
     def test_second_floor_arming_gap(self):
-        """After milestone 1 (floor 10), arming requires peak >= 21."""
+        """After ratchet: new floor is auto-armed immediately because peak
+        already satisfies floor * arm_bonus (10 * 1.05 = 10.5 < peak 20).
+        This is the FIXED behavior — previously the new floor required
+        peak > new_milestone.mult * 1.05 which was a bug."""
         el.record_milestone_hit(self.st, self.ms, 0)
         el.record_milestone_hit(self.st, self.ms, 1)
         self.st.peak_ratio = 20.0
+        # After milestone 1 ratchet floor=10; peak=20 >> 10*1.05=10.5 → auto-armed
         el.evaluate_ladder(20.0, self.ms, self.st)
-        assert self.st.floor_armed is False
-        el.evaluate_ladder(21.5, self.ms, self.st)
         assert self.st.floor_armed is True
+        assert self.st.current_floor == 10.0
+        # If price now dumps to 9.5 the trailing floor fires
         a = el.evaluate_ladder(9.5, self.ms, self.st)
         assert a.type == el.LadderActionType.SELL_ALL and "trailing_floor" in a.reason
 
