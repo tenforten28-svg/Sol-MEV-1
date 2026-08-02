@@ -28,6 +28,11 @@ User uploaded a Solana MEV/arbitrage bot zip, chose to deploy on Railway (~$5/mo
   7. Token-2022 honeypot extensions rejected: transferFeeConfig, permanentDelegate, nonTransferable, transferHook, mintCloseAuthority, defaultAccountState=Frozen
 - ✅ **[2026-02] Pump.fun direct bonding-curve auto-buy** — PumpPortal Local API + local signing. Master gate `PUMPFUN_AUTO_BUY_ENABLED=false` by default. Time-limit auto-exit.
 - ✅ **[2026-02] Pump.fun frontend panel** — detector + auto-buy status, 6 stat tiles, 9-item config strip, detection list with links, position event rows showing dev%/top1%/top10%/curve SOL inline color-coded.
+- ✅ **[2026-02] Production bug fixes (iteration_19)** — both surfaced by user's live Railway deployment:
+  - **BUG 1**: Pump.fun sniper detected 64 mints, made 0 buy attempts (safety_rejects=0). Mint extraction was scanning `Program log: mint: X` lines that pump.fun does not emit. FIXED by `getTransaction` with 3-retry, scanning accountKeys for pump-suffix (vanity `...pump`). Removed unsafe `accountKeys[1]` fallback (would mis-dispatch creator/PDA/fee accounts as mint). New status counters `mints_resolved / mints_unresolved / buys_dispatched` make this silent-failure pattern visible next time.
+  - **BUG 2**: Graduation sniper had 2335 sell_failed events on one illiquid mint (`9SP2..pump`, ratio 0.0212x). Position never removed after failed sells → infinite retry loop every 5s. FIXED with `GRADUATION_MAX_SELL_FAILURES=5` + `GRADUATION_SELL_RETRY_BACKOFF_SEC=30`: after N consecutive failures the position is ABANDONED (removed from positions dict + realized-loss trade row written to `db.trades` so cumulative PnL stays correct). Backoff prevents hot-loop retries. `sell_failures` resets on HOLD (not just successful sell) so rug-stop isn't gated by stale retry state.
+  - **520/520 tests passing** (iteration_19). Zero criticals.
+
 - ✅ **[2026-02] Doc 1 mcap-based scaled exit + Doc 2 Phase 3 landing-rate metrics**:
   - `PUMPFUN_LADDER_MODE=ratio|mcap`. Default mcap ladder = `10000:50:5000,60000:50:0,300000:100:0` (50% at $10k with $5k trail, 50% of remainder at $60k grad no-floor moonbag, 100% at $300k).
   - Entry mcap gate (`PUMPFUN_ENTRY_MCAP_MAX_USD`, default $5k). Absolute mcap rug stop (`PUMPFUN_RUG_STOP_MCAP_USD`, default $1300). Fee-economic skip (`PUMPFUN_MIN_SELL_USD`, default $0.20) — silent milestone advance.

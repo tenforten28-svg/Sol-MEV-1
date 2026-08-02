@@ -301,6 +301,10 @@ class GraduationExecutor:
                     decision = await self._evaluate(pos)
                     if decision:
                         await self._sell(mint, decision)
+                    elif pos.sell_failures > 0:
+                        # Position returned HOLD — clear the retry counter so future
+                        # exits (e.g. rug_stop) aren't gated by the backoff window.
+                        pos.sell_failures = 0
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -415,15 +419,42 @@ class GraduationExecutor:
             # is likely illiquid/rugged; keep retrying wastes RPC + spams logs.
             if pos.sell_failures >= self.cfg.max_sell_failures:
                 pos.closed = True
+                total_sold_sol = sum(p.get("sol_received", 0.0) for p in pos.partial_sells)
+                pnl_sol = total_sold_sol - pos.buy_sol
+                pnl_pct = (pnl_sol / pos.buy_sol * 100) if pos.buy_sol > 0 else 0.0
                 await self._record_event(mint, "abandoned", {
                     "reason": f"exceeded {self.cfg.max_sell_failures} sell failures",
                     "last_error": result.get("error"),
                     "ratio": ratio,
                     "buy_signature": pos.buy_signature,
                     "buy_sol": pos.buy_sol,
+                    "sell_sol_received": round(total_sold_sol, 6),
+                    "pnl_sol": round(pnl_sol, 6),
+                    "pnl_pct": round(pnl_pct, 2),
                     "hold_seconds": round(time.time() - pos.opened_at, 1),
                     "partial_sells": pos.partial_sells,
                 })
+                # Realized-loss trade row so cumulative PnL stays accurate
+                try:
+                    await self.db.trades.insert_one({
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "pair": f"SOL->{mint[:6]}..->STUCK",
+                        "type": "live_graduation_snipe",
+                        "source": pos.source,
+                        "amount_sol": pos.buy_sol,
+                        "sell_sol_received": round(total_sold_sol, 6),
+                        "pnl_sol": round(pnl_sol, 6),
+                        "pnl_pct": round(pnl_pct, 2),
+                        "success": False,
+                        "buy_signature": pos.buy_signature,
+                        "simulation": False,
+                        "mint": mint,
+                        "verdict": "abandoned",
+                        "abandoned": True,
+                        "sell_failures": pos.sell_failures,
+                    })
+                except Exception as e:
+                    logger.warning(f"[grad-sell] mongo trades insert on abandon: {e}")
                 self.positions.pop(mint, None)
                 logger.warning(f"[grad-sell] {mint[:6]} ABANDONED after {pos.sell_failures} sell failures")
             return
@@ -541,6 +572,8 @@ class GraduationExecutor:
                     for m in self.cfg.ladder
                 ],
                 "rug_stop_mult": self.cfg.rug_stop_mult,
+                "max_sell_failures": self.cfg.max_sell_failures,
+                "sell_retry_backoff_sec": self.cfg.sell_retry_backoff_sec,
             },
             "counters": {
                 "events_seen": self.events_seen,

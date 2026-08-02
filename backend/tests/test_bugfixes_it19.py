@@ -204,13 +204,17 @@ class TestBug1MintExtraction:
         assert s.db.pumpfun_detections.docs[-1]["candidate_mint"] == PUMP_MINT
 
     @pytest.mark.asyncio
-    async def test_fallback_to_accountkeys_index1(self, monkeypatch):
+    async def test_no_pump_suffix_means_no_dispatch(self, monkeypatch):
+        """When tx has no pump-suffix account, candidate_mint MUST stay None
+        (unsafe fallback to accountKeys[1] was removed — would mis-dispatch)."""
         s = _make_sniper(monkeypatch)
         _patch_session(monkeypatch, _FakeSessionFactory(
             [_tx_payload([OTHER_KEY_0, OTHER_KEY_1, OTHER_KEY_2])]))
-        _patch_autobuy(monkeypatch, [])
+        calls = _patch_autobuy(monkeypatch, []) or []
         await s._handle_log_notification(_make_notification(CREATE_LOGS))
-        assert s.db.pumpfun_detections.docs[-1]["candidate_mint"] == OTHER_KEY_1
+        assert s.db.pumpfun_detections.docs[-1]["candidate_mint"] is None
+        assert not calls   # no autobuy dispatched
+        assert s.mints_unresolved == 1
 
     @pytest.mark.asyncio
     async def test_retries_until_tx_indexed(self, monkeypatch):

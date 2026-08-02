@@ -146,14 +146,18 @@ class PumpFunSniper:
                         if isinstance(addr, str) and addr.endswith("pump") and len(addr) >= 40:
                             candidate_mint = addr
                             break
-                    # Fallback: pump.fun's create ix has mint at accountKeys[1] in the parsed message
-                    if not candidate_mint and len(keys) >= 2:
-                        first = keys[1]
-                        addr = first.get("pubkey") if isinstance(first, dict) else first
-                        if isinstance(addr, str) and len(addr) >= 40:
-                            candidate_mint = addr
+                    # NO accountKeys[1] fallback — heuristic can mis-select creator/PDA/fee
+                    # accounts, which then get dispatched as a fake mint and produce failed
+                    # buys (or worse, unintended buys against the wrong token account).
+                    # Prefer to skip detection than fire on a wrong address.
                 except Exception as e:
                     logger.debug(f"[pumpfun-sniper] mint extract failed: {e}")
+
+            # Counters for visibility — BUG 1 (silent 0-buys) was invisible from status
+            if candidate_mint:
+                self.mints_resolved = getattr(self, "mints_resolved", 0) + 1
+            else:
+                self.mints_unresolved = getattr(self, "mints_unresolved", 0) + 1
 
             self.detections += 1
             self.last_detection_at = datetime.now(timezone.utc).isoformat()
@@ -187,6 +191,7 @@ class PumpFunSniper:
                 try:
                     from pumpfun_autobuy import get_pumpfun_autobuyer
                     ab = get_pumpfun_autobuyer(self.db)
+                    self.buys_dispatched = getattr(self, "buys_dispatched", 0) + 1
                     asyncio.create_task(ab.maybe_buy(candidate_mint, signature=sig))
                 except Exception as e:
                     logger.debug(f"[pumpfun] autobuy trigger failed: {e}")
@@ -200,6 +205,9 @@ class PumpFunSniper:
             "running": self.running and self.task is not None and not self.task.done(),
             "wss_host": self.wss_url.split("/")[2] if self.wss_url.startswith("wss://") else None,
             "total_events_received": self.total_events,
+            "mints_resolved": getattr(self, "mints_resolved", 0),
+            "mints_unresolved": getattr(self, "mints_unresolved", 0),
+            "buys_dispatched": getattr(self, "buys_dispatched", 0),
             "new_mint_detections": self.detections,
             "last_detection_at": self.last_detection_at,
             "connection_count": self.connection_count,
