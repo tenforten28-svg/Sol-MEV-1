@@ -70,6 +70,10 @@ class GraduationExecutorConfig:
         self.ladder_cfg = os.environ.get("GRADUATION_LADDER", DEFAULT_LADDER_CFG).strip()
         self.rug_stop_mult = _fflt("GRADUATION_RUG_STOP", DEFAULT_RUG_STOP)
         self.ladder = parse_ladder(self.ladder_cfg)
+        # Sell-retry protection — abandons a position after N consecutive sell failures
+        # (illiquid / rugged / Jupiter no-route). Prevents infinite retry loops.
+        self.max_sell_failures = _fint("GRADUATION_MAX_SELL_FAILURES", 5)
+        self.sell_retry_backoff_sec = _fint("GRADUATION_SELL_RETRY_BACKOFF_SEC", 30)
         self.check_interval_sec = _fint("GRADUATION_CHECK_INTERVAL", 5)
         self.min_pool_sol = _fflt("GRADUATION_MIN_POOL_SOL", 50.0)
         self.slippage_bps = _fint("GRADUATION_SLIPPAGE_BPS", 1500)  # 15% (volatile snipes)
@@ -94,6 +98,11 @@ class GraduationPosition:
         self.ladder_state = LadderState()
         # For UI: history of partial-sell events
         self.partial_sells: list = []  # list of dicts with {milestone, ratio, sol_received, signature, ts}
+        # Sell-retry tracking — prevents infinite retry loop when Jupiter can't route
+        # (illiquid, rugged, or graduated further). After MAX_SELL_FAILS the position
+        # is abandoned (removed from positions dict and recorded as abandoned).
+        self.sell_failures = 0
+        self.last_sell_attempt_at = 0.0
 
 
 class GraduationExecutor:
@@ -283,6 +292,12 @@ class GraduationExecutor:
                 if not self.positions or not self.lt.ready:
                     continue
                 for mint, pos in list(self.positions.items()):
+                    # Respect sell-retry backoff — if we recently failed a sell, wait
+                    # before attempting again (Jupiter routing / liquidity may recover)
+                    if pos.sell_failures > 0:
+                        since_last = time.time() - pos.last_sell_attempt_at
+                        if since_last < self.cfg.sell_retry_backoff_sec:
+                            continue
                     decision = await self._evaluate(pos)
                     if decision:
                         await self._sell(mint, decision)
@@ -386,17 +401,36 @@ class GraduationExecutor:
             pass
 
         if not result.get("success"):
-            # Do NOT mark milestone hit — retry later
+            # Do NOT mark milestone hit — retry later, but track failures to avoid infinite loops
+            pos.sell_failures += 1
+            pos.last_sell_attempt_at = time.time()
             await self._record_event(mint, "sell_failed", {
                 "reason": reason, "sell_pct": sell_pct, "ratio": ratio,
                 "signature": result.get("signature"),
                 "error": result.get("error"),
+                "failure_count": pos.sell_failures,
                 "solscan_url": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
             })
+            # Abandon position after MAX_SELL_FAILURES consecutive failures — token
+            # is likely illiquid/rugged; keep retrying wastes RPC + spams logs.
+            if pos.sell_failures >= self.cfg.max_sell_failures:
+                pos.closed = True
+                await self._record_event(mint, "abandoned", {
+                    "reason": f"exceeded {self.cfg.max_sell_failures} sell failures",
+                    "last_error": result.get("error"),
+                    "ratio": ratio,
+                    "buy_signature": pos.buy_signature,
+                    "buy_sol": pos.buy_sol,
+                    "hold_seconds": round(time.time() - pos.opened_at, 1),
+                    "partial_sells": pos.partial_sells,
+                })
+                self.positions.pop(mint, None)
+                logger.warning(f"[grad-sell] {mint[:6]} ABANDONED after {pos.sell_failures} sell failures")
             return
 
         # Success — advance state
         pos.tokens_out -= tokens_to_sell
+        pos.sell_failures = 0  # reset retry counter on successful sell
         if is_partial and milestone_index is not None:
             record_milestone_hit(pos.ladder_state, self.cfg.ladder, milestone_index)
 

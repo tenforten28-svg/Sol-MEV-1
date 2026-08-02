@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 19 backend-only verification of the two production bug fixes (pump.fun mint extraction via getTransaction; graduation sell-failure abandon + backoff). Created /app/backend/tests/test_bugfixes_it19.py with 31 new tests: 10 for BUG 1 (pump-suffix key selection, suffix found at non-index-1, accountKeys[1] fallback, 3x retry with 0.8s backoff until tx indexed, tx-never-found -> candidate_mint=None AND no autobuy dispatch, RPC exception swallowed without crash, empty http_url -> extraction skipped/no RPC call/detection still persisted, non-Create logs ignored, http_url env wiring), 11 for BUG 2 (config defaults 5/30, position fields, failure increment + failure_count in sell_failed record, abandon at max with all required fields in the abandoned record, abandoned mint not iterated by _position_loop, backoff skip inside window, retry after backoff expiry, no skip when sell_failures==0, counter reset on successful partial sell, and a hot-loop simulation proving total swap attempts are bounded at max_sell_failures=5 instead of the live 2335), plus 12 endpoint regression checks + mongo _id leak check. Full suite: 520/520 passing (489 prior + 31 new) with `pytest tests/ -p no:anchorpy --ignore=tests/test_live_rpc_ping.py`. No live gates were enabled; all RPC/swap I/O faked. Frontend not tested (explicitly out of scope).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "pumpfun_sniper._handle_log_notification", "issue": "Mint extraction runs INLINE in the WSS consumer loop (awaited from `async for msg in ws`). Worst case per Create event is 3 getTransaction posts + 2x0.8s sleeps (~5s, up to ~18s with 6s HTTP timeouts) during which no further logsNotification messages are processed. On pump.fun's create rate this will stall/drop detections and add latency to every snipe. Offload to asyncio.create_task (as done for autobuy)."},
+      {"endpoint": "pumpfun_sniper._handle_log_notification", "issue": "accountKeys[1] fallback is an unvalidated heuristic: if the tx layout differs (versioned tx / ALT / different ix order) a NON-MINT account (creator, bonding-curve PDA, fee account) is dispatched to ab.maybe_buy(), causing wasted swap attempts on a bogus mint. Safer: read the mint from meta.postTokenBalances[].mint, or from the parsed Create instruction's accounts, and only fall back if that is empty."},
+      {"endpoint": "pumpfun_sniper._handle_log_notification", "issue": "Local `import aiohttp` inside the function shadows the module-level import (dead/redundant) and defeats monkeypatching pumpfun_sniper.aiohttp — tests must patch aiohttp.ClientSession globally. Also the retry loop sleeps 0.8s after the 3rd (final) failed attempt, and reassigns the outer `data` variable that holds the notification payload (works today only because sig/slot/logs were already extracted — fragile)."},
+      {"endpoint": "pumpfun_sniper.status()", "issue": "No counter for mint-resolution outcome. BUG 1 (64 detections / 0 buys) was invisible from status. Add mints_resolved / mints_unresolved / buys_dispatched counters so a recurrence is detectable without querying Mongo."},
+      {"endpoint": "/api/live/graduation/status", "issue": "status().config does not expose max_sell_failures or sell_retry_backoff_sec, and position_mints carries no per-position sell_failures, so the UI cannot show that a position is in backoff or why it was abandoned."},
+      {"endpoint": "graduation_executor._sell (abandon path)", "issue": "Abandoned positions record a graduation_positions 'abandoned' event but never write a db.trades row, so the realized/unrealized loss (buy_sol spent, tokens still held) is excluded from PnL aggregation — the more common outcome for illiquid mints is now silently missing from trade history."},
+      {"endpoint": "graduation_executor._position_loop", "issue": "sell_failures is only reset on a successful sell. A position that fails once and later returns HOLD keeps sell_failures>0 forever, so every subsequent tick is gated by the 30s backoff (slower rug_stop reaction) and 4 more unrelated failures across the whole hold window will abandon it. Consider resetting the counter after a successful quote/HOLD or aging it out."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_bugfixes_it19.py",
+    "/app/test_reports/pytest/pytest_results_it19.xml"
+  ],
+  "action_items": [
+    "Dispatch pumpfun mint extraction in a background task so the WSS loop is never blocked by up to 3 getTransaction round-trips",
+    "Harden mint resolution: prefer meta.postTokenBalances[].mint / parsed Create-instruction accounts over the raw accountKeys[1] fallback to avoid dispatching a buy on a non-mint address",
+    "Add mint-resolution counters to PumpFunSniper.status() (resolved / unresolved / buys_dispatched) so BUG 1 is observable in production",
+    "Expose max_sell_failures + sell_retry_backoff_sec in graduation status config, and per-position sell_failures in position data for the UI",
+    "Write a db.trades row (or an explicit loss record) when a graduation position is abandoned so PnL is not understated",
+    "Remove the redundant local `import aiohttp`, avoid reassigning the `data` notification variable, and skip the trailing 0.8s sleep on the final retry"
+  ],
+  "critical_code_review_comments": [
+    "BUG 1 fix is functionally correct for the mocked/real happy path (pump vanity suffix), but it is a synchronous inline RPC in a latency-critical WebSocket consumer — this trades one production failure (0 buys) for a throughput/latency risk. Make it fire-and-forget.",
+    "BUG 2 fix is correct and bounded: verified that with an always-failing swap the executor performs exactly max_sell_failures swap attempts then removes the mint from self.positions, so the 2335-event hot loop cannot recur. The backoff check in _position_loop uses `continue` before _evaluate, so no Jupiter quotes are burned either.",
+    "Empirical validation of the accountKeys[1] fallback against a real pump.fun Create tx could NOT be completed here (public Solana RPC timed out / no Create tx in the sampled 20-150 signatures). Recommend the main agent verify once against a known live Create signature before relying on the fallback for real buys."
+  ],
+  "updated_files": ["/app/backend/tests/test_bugfixes_it19.py"],
+  "success_rate": {"backend": "100% (520/520, excluding env-specific tests/test_live_rpc_ping.py)", "frontend": "not tested (out of scope)"},
+  "seed_data_creation": "None — fake Mongo collections, fake aiohttp session, scripted execute_swap; no live flags, DB untouched",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New regression file: /app/backend/tests/test_bugfixes_it19.py (31 tests). Run everything with `cd /app/backend && python -m pytest tests/ -p no:anchorpy -q --ignore=tests/test_live_rpc_ping.py` => 520 passing. Gotchas: (1) pumpfun_sniper does `import aiohttp` inside _handle_log_notification, so patch `aiohttp.ClientSession` (module attribute), not `pumpfun_sniper.aiohttp`; (2) GraduationExecutor._record_event writes to db.graduation_positions (NOT graduation_events) — assert against that collection; (3) tests drive _sell/_position_loop directly on locally built executors with a scripted execute_swap, so no live gate is ever touched.",
+  "rca_of_the_issue": "BUG 1: pump.fun does not emit `Program log: mint: X`, so the old log-scan always yielded candidate_mint=None and the `if candidate_mint:` guard skipped ab.maybe_buy() for all 64 detections (hence 0 buy_attempts AND 0 safety_rejects). Fix now resolves the mint from getTransaction accountKeys (pump vanity suffix, else index 1) — verified end-to-end with a mocked session: accountKeys=[X,'AAAA..pump',Y] -> candidate_mint='AAAA..pump' and maybe_buy dispatched with that mint + signature. BUG 2: a failed sell left the position in self.positions with no failure state, so _position_loop re-attempted every check_interval (5s) indefinitely (2335 sell_failed events ~3h). Fix adds pos.sell_failures/last_sell_attempt_at, a 30s backoff skip before _evaluate, and abandonment (closed=True + pop + 'abandoned' event) at 5 failures. Reproduced the old hot loop pattern in test_retry_loop_bounded_no_hot_loop: attempts are now capped at exactly 5 and the mint is dropped from positions."
+}

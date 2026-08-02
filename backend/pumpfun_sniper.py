@@ -38,6 +38,8 @@ class PumpFunSniper:
         # QuickNode wss URL. Reuses the same endpoint as the main RPC.
         self.wss_url = os.environ.get("QUICKNODE_WSS_URL", "") or \
             os.environ.get("SOLANA_RPC_URL", "").replace("https://", "wss://")
+        # HTTP RPC URL for tx lookups (mint extraction requires getTransaction)
+        self.http_url = os.environ.get("SOLANA_RPC_URL", "").strip()
         self.task: Optional[asyncio.Task] = None
         self.running = False
         # Counters
@@ -116,16 +118,42 @@ class PumpFunSniper:
             if not is_new_mint:
                 return
 
-            # Extract mint address heuristically from logs — pump.fun tokens end with "pump" suffix
+            # Extract mint address by fetching the tx and finding the pump.fun-suffix account.
+            # Pump.fun mints are vanity addresses ending in "pump".
             candidate_mint = None
-            for ln in logs:
-                # Look for lines like "Program log: mint: <address>"
-                if "mint:" in ln.lower():
-                    parts = ln.split(":")
-                    if len(parts) >= 3:
-                        candidate = parts[-1].strip()
-                        if len(candidate) >= 40:
-                            candidate_mint = candidate
+            if sig and self.http_url:
+                try:
+                    import aiohttp
+                    payload = {
+                        "jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+                        "params": [sig, {
+                            "encoding": "jsonParsed", "commitment": "confirmed",
+                            "maxSupportedTransactionVersion": 0,
+                        }],
+                    }
+                    async with aiohttp.ClientSession() as s:
+                        # Retry 3x — tx may not be indexed yet
+                        for _ in range(3):
+                            async with s.post(self.http_url, json=payload, timeout=6) as r:
+                                data = await r.json()
+                            if data.get("result"):
+                                break
+                            await asyncio.sleep(0.8)
+                        result = data.get("result") or {}
+                    keys = ((result.get("transaction") or {}).get("message") or {}).get("accountKeys") or []
+                    for k in keys:
+                        addr = k.get("pubkey") if isinstance(k, dict) else k
+                        if isinstance(addr, str) and addr.endswith("pump") and len(addr) >= 40:
+                            candidate_mint = addr
+                            break
+                    # Fallback: pump.fun's create ix has mint at accountKeys[1] in the parsed message
+                    if not candidate_mint and len(keys) >= 2:
+                        first = keys[1]
+                        addr = first.get("pubkey") if isinstance(first, dict) else first
+                        if isinstance(addr, str) and len(addr) >= 40:
+                            candidate_mint = addr
+                except Exception as e:
+                    logger.debug(f"[pumpfun-sniper] mint extract failed: {e}")
 
             self.detections += 1
             self.last_detection_at = datetime.now(timezone.utc).isoformat()
