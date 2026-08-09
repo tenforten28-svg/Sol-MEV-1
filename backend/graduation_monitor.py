@@ -138,7 +138,11 @@ class GraduationMonitor:
         while True:
             try:
                 async with websockets.connect(
-                    self.cfg.wss_url, ping_interval=20, ping_timeout=20, max_size=8_000_000
+                    self.cfg.wss_url,
+                    ping_interval=20,
+                    ping_timeout=40,   # tolerate slow pongs on Helius free tier
+                    close_timeout=5,
+                    max_size=8_000_000,
                 ) as ws:
                     sub = {
                         "jsonrpc": "2.0", "id": 1, "method": "logsSubscribe",

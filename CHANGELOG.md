@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-02 — Iteration 21 — Helius RPC indexing-lag fixes + WSS keepalive
+- **Symptom** (live Railway, Helius free tier):
+  - Pump.fun: 14/14 buys rejected with `dev_hold_unverifiable: tx not found (may not be confirmed yet)`. Bot never actually fired despite 154k+ WSS events.
+  - Graduation: 12 filter rejects with `low_liquidity: 0.0 SOL < min 50.0` even though `buys_successful: 3` on other events (WSS caught pool-init BEFORE LP-add landed → `postTokenBalances` read 0).
+  - WSS keepalive: `pumpswap wss: sent 1011 (internal error) keepalive ping timeout; no close frame received`.
+- **Root cause**: WSS pushes events on `processed` commitment, but HTTP node needs a beat to advance to `confirmed` and index. Our previous 3× / 1.5 s retry (~4.5 s) was under-provisioned for Helius free tier.
+- **Fixes**:
+  - `backend/pumpfun_autobuy.py`
+    - `_check_mint_safety`: now retries up to 5× / 1.0 s (~5 s) — mint account read is also lag-sensitive.
+    - `_check_dev_hold`: bumped retries from 3× / 1.5 s (~4.5 s) → **6× / 1.5 s (~9 s)** on top of the 4 s `settle_delay`.
+    - `_check_curve_state`: added same 5× / 1.0 s retry — PDA read has the same indexing lag.
+  - `backend/graduation_executor.py`
+    - New `_poll_pool_reserves(pool_address, min_sol, attempts, delay_s)` helper — reads the pool owner's WSOL vault(s) via `getTokenAccountsByOwner` with retries.
+    - After `settle_delay`, execute a **live re-poll** of pool reserves (up to 5 × 1 s). Reject only if fresh reading is < `min_pool_sol`. Refunds the pre-reserved slot + budget on reject.
+  - `backend/pumpfun_sniper.py`
+    - aiohttp `ws_connect(..., heartbeat=20, max_msg_size=8_000_000)` — Helius was silently reaping the socket after ~60 s of low activity, no ping to detect it.
+  - `backend/graduation_monitor.py`
+    - websockets `ping_timeout` 20 s → **40 s** (tolerate slow Helius free-tier pongs), added `close_timeout=5`.
+- **Tests**: `tests/test_pumpfun_failclosed_it14.py` updated for new retry count (3 → 6). `tests/test_graduation_it16.py` monkeypatch fixed to not recurse (captured original sleep). Full suite: 520 passed.
+
 ## 2026-02 — Iteration 20 — QuickNode WSS 429 reconnect storm fix
 - **Symptom** (live Railway): `connection_count: 20`, `last_error: "429 Invalid response status"`, `total_events_received: 0`. Every WSS connection attempt rejected by QuickNode with HTTP 429.
 - **Root cause**: three parallel WSS subscribers (pumpfun_sniper + graduation PumpSwap + graduation LaunchLab) on the same QuickNode endpoint with 1s initial reconnect backoff. First rate-limit response triggers reconnect storm, extending the 429 window indefinitely.

@@ -110,7 +110,7 @@ class TestDevHoldFailClosed:
         assert "dev_hold_unverifiable" in res["reason"], res["reason"]
         assert ab.buys_fired == 0
 
-    def test_dev_hold_retries_three_times(self):
+    def test_dev_hold_retries_six_times(self):
         ab = _armed_buyer()
         calls = {"n": 0}
 
@@ -131,7 +131,7 @@ class TestDevHoldFailClosed:
             res = asyncio.run(ab.maybe_buy(KNOWN_MINT, SIG))
         finally:
             pa.asyncio.sleep = real_sleep
-        assert calls["n"] == 3, f"expected 3 dev-hold attempts, got {calls['n']}"
+        assert calls["n"] == 6, f"expected 6 dev-hold attempts, got {calls['n']}"
         assert res["ok"] is False and "dev_hold_unverifiable" in res["reason"]
 
     def test_dev_hold_retry_succeeds_on_second_attempt(self):

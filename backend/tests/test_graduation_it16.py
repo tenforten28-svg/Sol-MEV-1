@@ -73,8 +73,10 @@ def _make_executor(monkeypatch, *, enabled, lt_ready, min_pool=50.0):
         jupiter=SimpleNamespace(get_quote=_boom),
     )
     monkeypatch.setattr(ge_mod, "get_live_trader", lambda: fake_lt)
-    # never actually wait the settle delay
-    monkeypatch.setattr(ge_mod.asyncio, "sleep", lambda *_a, **_k: asyncio.sleep(0))
+    # never actually wait the settle delay — capture the ORIGINAL sleep first so
+    # the replacement doesn't recurse into itself.
+    _original_sleep = asyncio.sleep
+    monkeypatch.setattr(ge_mod.asyncio, "sleep", lambda *_a, **_k: _original_sleep(0))
     ex = ge_mod.GraduationExecutor(_FakeDB())
     ex.cfg.enabled = enabled
     ex.cfg.min_pool_sol = min_pool

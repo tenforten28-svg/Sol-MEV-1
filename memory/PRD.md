@@ -81,7 +81,12 @@ User uploaded a Solana MEV/arbitrage bot zip, chose to deploy on Railway (~$5/mo
 1. Kill-switch UI (post-auth).
 2. Populate `Position.token_amount` from post-buy `getTokenAccountsByOwner` and enable accurate PnL.
 3. `accountSubscribe` for real-time bonding-curve price watching.
+4. Tune `PUMPFUN_LADDER_MCAP` thresholds based on first 2-3 weeks of live trading data.
+5. Evaluate secondary HTTP RPC (Alchemy) if Helius credits deplete.
 
 ## Next Tasks
-1. User to arm on Railway: set `PUMPFUN_SNIPER_ENABLED=true`, verify detections flow, then `PUMPFUN_AUTO_BUY_ENABLED=true` with a small budget.
-2. Observe first snipes via dashboard; iterate on filters.
+1. **[2026-02 iter-21]** User to redeploy Railway with the RPC-indexing-lag fixes and observe:
+   - `pumpfun autobuy_status.rejects_safety` should stop increasing purely from `dev_hold_unverifiable`; expect first successful buys.
+   - `graduation.status.last_reason` should show fewer `low_liquidity: 0.0 SOL` rejects.
+   - `graduation.last_error` keepalive timeouts should be less frequent.
+2. Add auth to `/api/live/*` mutation endpoints (P0 #1).

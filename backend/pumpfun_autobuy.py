@@ -548,8 +548,16 @@ class PumpFunAutoBuyer:
         # Wait for the initial buy/liquidity to settle
         await asyncio.sleep(self.cfg.settle_delay_sec)
 
-        # Safety pre-check: mint/freeze authorities + Token-2022 extensions
-        safety = await self._check_mint_safety(mint)
+        # Safety pre-check: mint/freeze authorities + Token-2022 extensions.
+        # Helius (and Solana RPC in general) has indexing lag AFTER a fresh mint —
+        # the mint account can return empty data for several seconds. Retry until
+        # we get a parsed mint account or exhaust attempts.
+        safety = None
+        for _ in range(5):
+            safety = await self._check_mint_safety(mint)
+            if safety.get("ok") and safety.get("decimals") is not None:
+                break
+            await asyncio.sleep(1.0)
         if self.cfg.require_authorities_revoked and not safety.get("authorities_safe"):
             self.rejects_safety += 1
             self.last_reason = f"safety_fail: mint_rev={safety.get('mint_authority_revoked')} freeze_rev={safety.get('freeze_authority_revoked')}"
@@ -570,10 +578,12 @@ class PumpFunAutoBuyer:
                 self.last_reason = "dev_hold_unknown: no detection signature (cannot verify creator holdings)"
                 await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety})
                 return {"ok": False, "reason": self.last_reason}
-            # Retry the tx fetch up to 3 times because getTransaction often returns null
-            # for the first few seconds after a fresh mint.
+            # Retry the tx fetch up to 6 times (~9s) because Helius often returns
+            # null on `getTransaction` for the first few seconds after a fresh mint
+            # (WSS pushes on `processed`, but the HTTP node needs to advance to
+            # `confirmed` and finish indexing before the tx meta is queryable).
             dev = None
-            for attempt in range(3):
+            for attempt in range(6):
                 dev = await self._check_dev_hold(signature, mint, safety.get("supply"))
                 if dev.get("ok"):
                     break
@@ -589,8 +599,14 @@ class PumpFunAutoBuyer:
                 await self._record_position_event(mint, "rejected", {"reason": self.last_reason, "safety": safety, "dev": dev})
                 return {"ok": False, "reason": self.last_reason, "dev": dev}
 
-        # Bonding curve liquidity + not-graduated check
-        curve = await self._check_curve_state(mint)
+        # Bonding curve liquidity + not-graduated check. Also indexing-lag-sensitive
+        # (the PDA read can return an empty account for a few seconds post-mint).
+        curve = None
+        for _ in range(5):
+            curve = await self._check_curve_state(mint)
+            if curve.get("ok"):
+                break
+            await asyncio.sleep(1.0)
         if not curve.get("ok"):
             self.rejects_safety += 1
             self.last_reason = f"curve_read_fail: {curve.get('reason')}"

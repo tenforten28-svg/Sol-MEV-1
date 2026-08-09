@@ -90,7 +90,15 @@ class PumpFunSniper:
     async def _connect_and_listen(self):
         self.connection_count += 1
         async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(self.wss_url, timeout=aiohttp.ClientTimeout(total=30)) as ws:
+            # heartbeat=20 sends a WS ping every 20s so Helius doesn't reap the
+            # socket for inactivity. Without this the connection dies silently
+            # after ~60s of low activity.
+            async with session.ws_connect(
+                self.wss_url,
+                timeout=aiohttp.ClientTimeout(total=30),
+                heartbeat=20,
+                max_msg_size=8_000_000,
+            ) as ws:
                 # Subscribe to pump.fun program logs
                 sub_req = {
                     "jsonrpc": "2.0", "id": 1, "method": "logsSubscribe",

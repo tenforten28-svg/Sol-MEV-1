@@ -188,14 +188,13 @@ class GraduationExecutor:
             self.last_reason = f"cooldown {int(self.cfg.cooldown_sec - elapsed)}s"
             return {"ok": False, "reason": self.last_reason}
 
-        # Liquidity filter
+        # Liquidity filter — but the monitor may have caught the pool-init tx
+        # BEFORE the LP-add tx landed on the same slot, so `reserves_sol` from
+        # the event can read 0. Do a live re-poll of the pool's SOL vault below
+        # (after settle) to get an authoritative value. Only reject here if the
+        # event value is already ABOVE the minimum (fast-path accept OK) — never
+        # reject on a possibly-stale 0 without a fresh check.
         reserves = float(event.get("reserves_sol") or 0)
-        if reserves < self.cfg.min_pool_sol:
-            self.rejects_filter += 1
-            self.last_reason = f"low_liquidity: {reserves} SOL < min {self.cfg.min_pool_sol}"
-            await self._record_event(event["mint"], "rejected",
-                                     {"reason": self.last_reason, "event": event})
-            return {"ok": False, "reason": self.last_reason}
 
         # Pre-reserve slot BEFORE settle so a concurrent event can't pass max_concurrent
         mint = event["mint"]
@@ -210,6 +209,25 @@ class GraduationExecutor:
 
         # FADE THE DUMP — settle
         await asyncio.sleep(self.cfg.settle_delay_sec)
+
+        # LIVE re-poll of pool reserves — the WSS may have fired before LP-add
+        # landed. Poll for up to ~5s until reserves cross the min threshold, else
+        # reject with a fresh, authoritative reading.
+        fresh_reserves = await self._poll_pool_reserves(
+            event.get("pool_address"), min_sol=self.cfg.min_pool_sol,
+            attempts=5, delay_s=1.0,
+        )
+        if fresh_reserves < self.cfg.min_pool_sol:
+            # Release the pre-reserved slot + budget
+            self.positions.pop(mint, None)
+            self.day_spent_sol -= self.cfg.buy_sol
+            self.rejects_filter += 1
+            self.last_reason = f"low_liquidity: {fresh_reserves} SOL < min {self.cfg.min_pool_sol} (post-settle)"
+            await self._record_event(mint, "rejected",
+                                     {"reason": self.last_reason, "event": event,
+                                      "fresh_reserves_sol": fresh_reserves})
+            return {"ok": False, "reason": self.last_reason}
+        reserves = fresh_reserves
 
         # Re-check kill switch after sleep (in case emergency_stop fired during settle)
         if not self.cfg.enabled:
@@ -283,6 +301,50 @@ class GraduationExecutor:
             "reserves_sol": reserves,
         })
         return {"ok": True, "signature": result["signature"], "mint": mint}
+
+    # ---------- pool reserves polling ----------
+    async def _poll_pool_reserves(self, pool_address: Optional[str],
+                                  min_sol: float, attempts: int = 5,
+                                  delay_s: float = 1.0) -> float:
+        """Return live SOL reserves of the graduation pool, retrying until >= min_sol
+        or attempts exhausted. Uses getTokenAccountsByOwner on the pool owner to
+        find its WSOL vault, then reads the balance.
+        Returns 0.0 on any error / no route."""
+        if not pool_address or not getattr(self.lt.cfg, "rpc_url", None):
+            return 0.0
+        import aiohttp, json  # local import to avoid module-load churn
+        payload = {
+            "jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
+            "params": [
+                pool_address,
+                {"mint": SOL_MINT},
+                {"encoding": "jsonParsed", "commitment": "confirmed"},
+            ],
+        }
+        best = 0.0
+        for _ in range(max(1, attempts)):
+            try:
+                async with aiohttp.ClientSession() as s:
+                    async with s.post(self.lt.cfg.rpc_url, json=payload, timeout=8) as r:
+                        data = await r.json()
+                accounts = ((data.get("result") or {}).get("value") or [])
+                total_lamports = 0
+                for acc in accounts:
+                    info = (((acc.get("account") or {}).get("data") or {}).get("parsed") or {}).get("info") or {}
+                    amt = (info.get("tokenAmount") or {}).get("amount")
+                    try:
+                        total_lamports += int(amt or 0)
+                    except Exception:
+                        pass
+                sol = total_lamports / LAMPORTS_PER_SOL
+                if sol > best:
+                    best = sol
+                if sol >= min_sol:
+                    return sol
+            except Exception as e:
+                logger.debug(f"[grad-poll] reserves lookup failed: {e}")
+            await asyncio.sleep(delay_s)
+        return best
 
     # ---------- position monitor loop ----------
     async def _position_loop(self):
