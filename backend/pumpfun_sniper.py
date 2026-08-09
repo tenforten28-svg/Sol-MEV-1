@@ -69,15 +69,23 @@ class PumpFunSniper:
 
     async def _loop(self):
         """Reconnecting WebSocket loop. Auto-retry on disconnect."""
+        base_backoff = 10
+        current_backoff = base_backoff
         while self.running:
             try:
                 await self._connect_and_listen()
+                current_backoff = base_backoff  # reset on successful cycle
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 self.last_error = str(e)
-                logger.warning(f"[pumpfun] loop error, reconnecting in 10s: {e}")
-                await asyncio.sleep(10)
+                # 429 = QuickNode WSS rate limit. Back off HARD (60s+) so the
+                # rate-limit window can expire instead of hammering reconnects.
+                if "429" in str(e):
+                    current_backoff = max(current_backoff, 60)
+                logger.warning(f"[pumpfun] loop error, reconnecting in {current_backoff}s: {e}")
+                await asyncio.sleep(current_backoff)
+                current_backoff = min(current_backoff * 2, 300)
 
     async def _connect_and_listen(self):
         self.connection_count += 1

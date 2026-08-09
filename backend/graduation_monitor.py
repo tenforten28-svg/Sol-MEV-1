@@ -131,8 +131,10 @@ class GraduationMonitor:
             await self._session.close()
 
     async def _subscription_loop(self, source: str, program_id: str, markers: tuple):
-        """Robust WSS loop with reconnect + backoff."""
-        backoff = 1
+        """Robust WSS loop with reconnect + backoff.
+        Starts at 10s (not 1s) because QuickNode returns 429 on rapid reconnects,
+        and further increases when 429 is detected."""
+        backoff = 10
         while True:
             try:
                 async with websockets.connect(
@@ -147,16 +149,21 @@ class GraduationMonitor:
                     }
                     await ws.send(json.dumps(sub))
                     logger.info(f"[graduation:{source}] subscribed to {program_id}")
-                    backoff = 1
+                    backoff = 10
                     async for raw in ws:
                         await self._handle_notification(source, markers, raw)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 self.last_error = f"{source} wss: {e}"
+                # 429 = QuickNode plan / concurrent WSS limit. Back off HARD to give
+                # the rate-limit window (typically 60s) time to expire.
+                is_429 = "429" in str(e)
+                if is_429:
+                    backoff = max(backoff, 60)
                 logger.warning(f"[graduation:{source}] wss error: {e}; reconnect in {backoff}s")
                 await asyncio.sleep(backoff)
-                backoff = min(backoff * 2, 60)
+                backoff = min(backoff * 2, 300)
 
     async def _handle_notification(self, source: str, markers: tuple, raw: str):
         try:
