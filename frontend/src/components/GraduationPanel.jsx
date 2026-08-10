@@ -265,38 +265,43 @@ export default function GraduationPanel() {
           {positions.length === 0 && (
             <div className="text-slate-500 text-sm p-3">No positions yet.</div>
           )}
-          {positions.map((p, i) => (
+          {positions.map((p, i) => {
+            // Defense: legacy rows in mongo may have `p.event` clobbered by a
+            // graduation_event object (fixed in backend iter-22, but historical
+            // docs remain). Coerce to string so rendering never crashes.
+            const eventLabel = typeof p.event === "string" ? p.event : "legacy";
+            return (
             <div key={i} data-testid={`graduation-position-${i}`} className="p-2 text-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge
                     className={
-                      p.event === "opened"
+                      eventLabel === "opened"
                         ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                        : p.event === "partial_sell"
+                        : eventLabel === "partial_sell"
                         ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                        : p.event === "closed"
+                        : eventLabel === "closed"
                         ? (p.pnl_sol > 0
                             ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                             : "bg-blue-500/20 text-blue-300 border-blue-500/40")
-                        : p.event === "rejected"
+                        : eventLabel === "rejected"
                         ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                         : "bg-red-500/20 text-red-300 border-red-500/40"
                     }
                   >
-                    {p.event}
+                    {eventLabel}
                   </Badge>
                   <span className="text-white font-mono">{shortMint(p.mint)}</span>
-                  {p.source && <span className="text-slate-500">{p.source}</span>}
+                  {typeof p.source === "string" && <span className="text-slate-500">{p.source}</span>}
                 </div>
                 <span className="text-slate-500">
                   {p.at ? new Date(p.at).toLocaleTimeString() : ""}
                 </span>
               </div>
               <div className="mt-1 text-slate-400 flex flex-wrap gap-x-3">
-                {p.verdict && <span>verdict: <span className="text-slate-200">{p.verdict}</span></span>}
-                {p.reason && p.event === "partial_sell" && <span className="text-purple-300">{p.reason}</span>}
-                {p.ratio != null && <span>ratio: <span className="text-emerald-300">{p.ratio}x</span></span>}
+                {typeof p.verdict === "string" && <span>verdict: <span className="text-slate-200">{p.verdict}</span></span>}
+                {typeof p.reason === "string" && eventLabel === "partial_sell" && <span className="text-purple-300">{p.reason}</span>}
+                {p.ratio != null && typeof p.ratio !== "object" && <span>ratio: <span className="text-emerald-300">{p.ratio}x</span></span>}
                 {p.peak_ratio != null && <span>peak: <span className="text-amber-300">{p.peak_ratio}x</span></span>}
                 {p.current_floor != null && <span>floor: {p.current_floor}x</span>}
                 {p.sell_pct_of_current != null && <span>sold: {p.sell_pct_of_current}%</span>}
@@ -312,20 +317,21 @@ export default function GraduationPanel() {
                 )}
                 {p.reserves_sol != null && <span>pool: {p.reserves_sol} SOL</span>}
                 {p.hold_seconds != null && <span>held: {p.hold_seconds}s</span>}
-                {p.reason && <span className="text-amber-300">{p.reason}</span>}
-                {p.solscan_url && (
+                {typeof p.reason === "string" && eventLabel !== "partial_sell" && <span className="text-amber-300">{p.reason}</span>}
+                {typeof p.solscan_url === "string" && (
                   <a href={p.solscan_url} target="_blank" rel="noreferrer" className="text-emerald-300 hover:underline">
                     buy tx
                   </a>
                 )}
-                {p.solscan_sell && (
+                {typeof p.solscan_sell === "string" && (
                   <a href={p.solscan_sell} target="_blank" rel="noreferrer" className="text-blue-300 hover:underline">
                     sell tx
                   </a>
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

@@ -12,6 +12,7 @@ import { TrendingUp, TrendingDown, Activity, DollarSign, Target, Zap, Play, Paus
 import LiveTradingPanel from './LiveTradingPanel';
 import PumpfunPanel from './PumpfunPanel';
 import GraduationPanel from './GraduationPanel';
+import ErrorBoundary from './ErrorBoundary';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -166,9 +167,15 @@ const Dashboard = () => {
 
       {/* LIVE TRADING PANEL — separate from simulation stats below */}
       <div className="max-w-7xl mx-auto">
-        <LiveTradingPanel />
-        <PumpfunPanel />
-        <GraduationPanel />
+        <ErrorBoundary name="live-trading">
+          <LiveTradingPanel />
+        </ErrorBoundary>
+        <ErrorBoundary name="pumpfun">
+          <PumpfunPanel />
+        </ErrorBoundary>
+        <ErrorBoundary name="graduation">
+          <GraduationPanel />
+        </ErrorBoundary>
       </div>
 
       {/* Stats Cards */}

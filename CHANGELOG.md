@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-02 — Iteration 22 — CRITICAL: Vercel dashboard blank-screen fix (React error #31)
+- **Symptom**: `https://sol-mev-1.vercel.app/` rendered a completely blank black page. Zero visible errors in the user's console (only harmless Vercel preload warnings).
+- **Root cause**: `graduation_executor.py._record_event(mint, event, data)` inserts `{"event": event, **data}` into `db.graduation_positions`. Three callers passed `data={"event": event_dict, ...}` where `event_dict` is the full graduation event `{source, mint, pool_address, ...}`. The `**data` spread OVERWROTE the position's own `event` LABEL string with a dict. Frontend `GraduationPanel.jsx` then rendered `{p.event}` as JSX text → React error #31 (unminified: *"Objects are not valid as a React child"*) → whole React tree unmounted → blank body.
+- **Fixes**:
+  - `backend/graduation_executor.py`
+    - `_record_event`: now defensively renames any incoming `data["event"]` → `data["graduation_event"]` before spread so the position event label can never be clobbered again.
+    - The 3 callers that were passing `"event": event` renamed to `"graduation_event": event` (defense in depth).
+  - `frontend/src/components/GraduationPanel.jsx`
+    - All fields defensively type-checked before render: `p.event`, `p.reason`, `p.verdict`, `p.source`, `p.solscan_url`, `p.solscan_sell` — if a legacy corrupted mongo doc has an object there, the field is skipped instead of crashing render. Historical bad rows now show label `"legacy"` rather than crashing.
+  - `frontend/src/components/ErrorBoundary.jsx` (new) + wrapped `LiveTradingPanel`, `PumpfunPanel`, `GraduationPanel` in `Dashboard.js`. If ANY future component throws, only that panel shows a red retry banner — the rest of the dashboard keeps working.
+- **User must**: redeploy the frontend to Vercel (git push or trigger a manual redeploy). Backend can also be redeployed to stop the write-side collision going forward, but frontend defensiveness makes it safe to keep serving old data.
+
 ## 2026-02 — Iteration 21 — Helius RPC indexing-lag fixes + WSS keepalive
 - **Symptom** (live Railway, Helius free tier):
   - Pump.fun: 14/14 buys rejected with `dev_hold_unverifiable: tx not found (may not be confirmed yet)`. Bot never actually fired despite 154k+ WSS events.

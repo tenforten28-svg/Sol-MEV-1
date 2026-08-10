@@ -224,7 +224,7 @@ class GraduationExecutor:
             self.rejects_filter += 1
             self.last_reason = f"low_liquidity: {fresh_reserves} SOL < min {self.cfg.min_pool_sol} (post-settle)"
             await self._record_event(mint, "rejected",
-                                     {"reason": self.last_reason, "event": event,
+                                     {"reason": self.last_reason, "graduation_event": event,
                                       "fresh_reserves_sol": fresh_reserves})
             return {"ok": False, "reason": self.last_reason}
         reserves = fresh_reserves
@@ -236,7 +236,7 @@ class GraduationExecutor:
             self.rejects_gate += 1
             self.last_reason = "kill_switch_during_settle"
             await self._record_event(mint, "rejected",
-                                     {"reason": self.last_reason, "event": event})
+                                     {"reason": self.last_reason, "graduation_event": event})
             return {"ok": False, "reason": self.last_reason}
         if not self.lt.ready:
             self.positions.pop(mint, None)
@@ -274,7 +274,7 @@ class GraduationExecutor:
             await self._record_event(mint, "buy_failed", {
                 "reason": self.last_reason, "signature": result.get("signature"),
                 "solscan_url": f"https://solscan.io/tx/{result.get('signature')}" if result.get("signature") else None,
-                "event": event,
+                "graduation_event": event,
             })
             return {"ok": False, "reason": self.last_reason, "signature": result.get("signature")}
 
@@ -602,12 +602,20 @@ class GraduationExecutor:
             })
 
     async def _record_event(self, mint: str, event: str, data: Dict):
+        """Persist a position lifecycle event. Guards against callers accidentally
+        passing an 'event' key inside `data` (which would clobber the event LABEL
+        string via **data spread — and the frontend renders {p.event} as JSX
+        text, so a dict there crashes the whole React tree with error #31).
+        Any incoming `data['event']` is renamed to `graduation_event`."""
         try:
+            safe_data = dict(data)
+            if "event" in safe_data:
+                safe_data["graduation_event"] = safe_data.pop("event")
             await self.db.graduation_positions.insert_one({
                 "at": datetime.now(timezone.utc).isoformat(),
                 "mint": mint,
                 "event": event,
-                **data,
+                **safe_data,
             })
         except Exception:
             pass
